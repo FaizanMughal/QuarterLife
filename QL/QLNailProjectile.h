@@ -11,26 +11,29 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "QLWeapon.h"
-#include "QLWeaponRocketLauncher.generated.h"
+#include "QLProjectile.h"
+#include "QLNailProjectile.generated.h"
 
-class AQLRocketProjectile;
+class UProjectileMovementComponent;
+class USphereComponent;
+class AQLPlayerController;
+class ADecalActor;
+
 //------------------------------------------------------------
 //------------------------------------------------------------
 UCLASS()
-class QL_API AQLWeaponRocketLauncher : public AQLWeapon
+class QL_API AQLNailProjectile : public AQLProjectile
 {
 	GENERATED_BODY()
 
 public:
-    AQLWeaponRocketLauncher();
+    AQLNailProjectile();
 
-    virtual void OnFire() override;
 protected:
-    virtual void Tick(float DeltaTime) override;
-
     virtual void PostInitializeComponents() override;
 
+    virtual void OnBeginOverlapForComponent(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult) override;
+
     UPROPERTY(EditDefaultsOnly, Category = "C++Property")
-    TSubclassOf<AQLRocketProjectile> RocketProjectileClass;
+    TSubclassOf<ADecalActor> DecalClass;
 };

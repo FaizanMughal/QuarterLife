@@ -11,7 +11,6 @@
 
 #include "QLWeapon.h"
 #include "Components/SphereComponent.h"
-#include "Kismet/GameplayStatics.h"
 #include "QLCharacter.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Particles/ParticleSystemComponent.h"
@@ -32,13 +31,11 @@ AQLWeapon::AQLWeapon()
  	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
 
-    WeaponName = "None";
+    QLName = "None";
     HitRange = 10000.0f;
     RateOfFire = 1.0f;
     bIsFireHeld = false;
     bFireEnabled = true;
-
-    RootSphereComponent->OnComponentBeginOverlap.AddDynamic(this, &AQLWeapon::OnComponentBeginOverlapImpl);
 
     GunSkeletalMeshComponent = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("GunSkeletalMeshComponent"));
     GunSkeletalMeshComponent->SetupAttachment(RootComponent);
@@ -158,13 +155,6 @@ FVector AQLWeapon::GetMuzzleLocation()
 
 //------------------------------------------------------------
 //------------------------------------------------------------
-FName AQLWeapon::GetWeaponName()
-{
-    return WeaponName;
-}
-
-//------------------------------------------------------------
-//------------------------------------------------------------
 void AQLWeapon::SetHitRange(float HitRangeExt)
 {
     HitRange = HitRangeExt;
@@ -212,9 +202,21 @@ void AQLWeapon::OnComponentBeginOverlapImpl(UPrimitiveComponent* OverlappedComp,
     AQLCharacter* QLCharacter = Cast<AQLCharacter>(OtherActor);
     if (QLCharacter)
     {
+        // if the character has weapon of this type already, nothing will happen
+        if (QLCharacter->HasWeapon(this->GetQLName()))
+        {
+            return;
+        }
+
         QLCharacter->AddWeapon(this);
-        QLCharacter->SetCurrentWeapon(this->GetWeaponName());
+        QLCharacter->SetCurrentWeapon(this->GetQLName());
         PlaySound("PickUp");
+
+        // disable delegate
+        if (RootSphereComponent)
+        {
+            RootSphereComponent->OnComponentBeginOverlap.RemoveDynamic(this, &AQLWeapon::OnComponentBeginOverlapImpl);
+        }
     }
 }
 

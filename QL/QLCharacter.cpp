@@ -18,6 +18,8 @@
 #include "DrawDebugHelpers.h"
 #include "QLWeapon.h"
 #include "QLWeaponManager.h"
+#include "QLAbility.h"
+#include "QLAbilityManager.h"
 #include "QLPowerupManager.h"
 #include "QLUtility.h"
 #include "QLPlayerController.h"
@@ -26,6 +28,9 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "QLPowerup.h"
+#include "QLUmgFirstPerson.h"
+#include "QLUmgInventory.h"
+#include "Components/AudioComponent.h"
 
 //------------------------------------------------------------
 // Sets default values
@@ -37,6 +42,9 @@ AQLCharacter::AQLCharacter()
     Armor = 100.0f;
     MaxArmor = 150.0f;
     ProtectionMultiplier = 1.0f;
+
+    bCanFireAndAltFire = true;
+    bCanSwitchWeapon = true;
 
     // Set size for collision capsule
     // original value: 55.f, 96.0f
@@ -70,6 +78,8 @@ AQLCharacter::AQLCharacter()
     ThirdPersonMesh->bOwnerNoSee = true;
     ThirdPersonMesh->CastShadow = true;
     ThirdPersonMesh->bCastDynamicShadow = true;
+    ThirdPersonMesh->bRenderCustomDepth = true;
+    ThirdPersonMesh->CustomDepthStencilValue = 1;
 
     // Set this character to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
     PrimaryActorTick.bCanEverTick = true;
@@ -89,6 +99,16 @@ void AQLCharacter::BeginPlay()
 
     UpdateHealth();
     UpdateArmor();
+
+    if (WeaponManager)
+    {
+        WeaponManager->CreateAndAddAllWeapons(WeaponClassList);
+    }
+
+    if (AbilityManager)
+    {
+        AbilityManager->CreateAndAddAllAbilities(AbilityClassList);
+    }
 }
 
 //------------------------------------------------------------
@@ -103,6 +123,9 @@ void AQLCharacter::PostInitializeComponents()
     // to do: investigate
     WeaponManager = NewObject<UQLWeaponManager>(this);
     WeaponManager->SetUser(this);
+
+    AbilityManager = NewObject<UQLAbilityManager>(this);
+    AbilityManager->SetUser(this);
 
     PowerupManager = NewObject<UQLPowerupManager>(this);
     PowerupManager->SetUser(this);
@@ -150,9 +173,13 @@ void AQLCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
     PlayerInputComponent->BindAction("SwitchToRocketLauncher", EInputEvent::IE_Pressed, this, &AQLCharacter::SwitchToRocketLauncher);
     PlayerInputComponent->BindAction("SwitchToLightningGun", EInputEvent::IE_Pressed, this, &AQLCharacter::SwitchToLightningGun);
     PlayerInputComponent->BindAction("SwitchToRailGun", EInputEvent::IE_Pressed, this, &AQLCharacter::SwitchToRailGun);
+    PlayerInputComponent->BindAction("SwitchToNailGun", EInputEvent::IE_Pressed, this, &AQLCharacter::SwitchToNailGun);
     PlayerInputComponent->BindAction("SwitchToPortalGun", EInputEvent::IE_Pressed, this, &AQLCharacter::SwitchToPortalGun);
+    PlayerInputComponent->BindAction("SwitchToGrenadeLauncher", EInputEvent::IE_Pressed, this, &AQLCharacter::SwitchToGrenadeLauncher);
 
     PlayerInputComponent->BindAction("RestartLevel", EInputEvent::IE_Pressed, this, &AQLCharacter::OnRestartLevel);
+
+    PlayerInputComponent->BindAction("UseAbility", EInputEvent::IE_Pressed, this, &AQLCharacter::OnUseAbility);
 
     // Bind movement events
     PlayerInputComponent->BindAxis("MoveForward", this, &AQLCharacter::MoveForward);
@@ -191,6 +218,11 @@ void AQLCharacter::MoveRight(float Value)
 //------------------------------------------------------------
 void AQLCharacter::OnFire()
 {
+    if (!bCanFireAndAltFire)
+    {
+        return;
+    }
+
     if (!WeaponManager)
     {
         return;
@@ -207,6 +239,11 @@ void AQLCharacter::OnFire()
 //------------------------------------------------------------
 void AQLCharacter::OnFireRelease()
 {
+    if (!bCanFireAndAltFire)
+    {
+        return;
+    }
+
     if (!WeaponManager)
     {
         return;
@@ -223,6 +260,11 @@ void AQLCharacter::OnFireRelease()
 //------------------------------------------------------------
 void AQLCharacter::OnAltFire()
 {
+    if (!bCanFireAndAltFire)
+    {
+        return;
+    }
+
     if (!WeaponManager)
     {
         return;
@@ -239,6 +281,11 @@ void AQLCharacter::OnAltFire()
 //------------------------------------------------------------
 void AQLCharacter::OnAltFireRelease()
 {
+    if (!bCanFireAndAltFire)
+    {
+        return;
+    }
+
     if (!WeaponManager)
     {
         return;
@@ -260,6 +307,24 @@ float AQLCharacter::GetHealth() const
 
 //------------------------------------------------------------
 //------------------------------------------------------------
+void AQLCharacter::AddHealth(float Increment)
+{
+    float Temp = Health + Increment;
+
+    if (Temp >= MaxHealth)
+    {
+        Health = MaxHealth;
+    }
+    else
+    {
+        Health = Temp;
+    }
+
+    UpdateHealth();
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
 float AQLCharacter::GetMaxHealth() const
 {
     return MaxHealth;
@@ -270,6 +335,24 @@ float AQLCharacter::GetMaxHealth() const
 float AQLCharacter::GetArmor() const
 {
     return Armor;
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLCharacter::AddArmor(float Increment)
+{
+    float Temp = Armor + Increment;
+
+    if (Temp >= MaxArmor)
+    {
+        Armor = MaxArmor;
+    }
+    else
+    {
+        Armor = Temp;
+    }
+
+    UpdateArmor();
 }
 
 //------------------------------------------------------------
@@ -285,6 +368,13 @@ float AQLCharacter::GetMaxArmor() const
 USkeletalMeshComponent* AQLCharacter::GetFirstPersonMesh()
 {
     return FirstPersonMesh;
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+USkeletalMeshComponent* AQLCharacter::GetThirdPersonMesh()
+{
+    return ThirdPersonMesh;
 }
 
 //------------------------------------------------------------
@@ -305,6 +395,18 @@ void AQLCharacter::AddWeapon(AQLWeapon* Weapon)
     }
 
     WeaponManager->AddWeapon(Weapon);
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLCharacter::AddAbility(AQLAbility* Ability)
+{
+    if (!AbilityManager)
+    {
+        return;
+    }
+
+    AbilityManager->AddAbility(Ability);
 }
 
 //------------------------------------------------------------
@@ -333,14 +435,26 @@ void AQLCharacter::RemovePowerup(AQLPowerup* Powerup)
 
 //------------------------------------------------------------
 //------------------------------------------------------------
-void AQLCharacter::SetCurrentWeapon(const FName& WeaponName)
+void AQLCharacter::SetCurrentWeapon(const FName& QLName)
 {
     if (!WeaponManager)
     {
         return;
     }
 
-    WeaponManager->SetCurrentWeapon(WeaponName);
+    WeaponManager->SetCurrentWeapon(QLName);
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLCharacter::SetCurrentAbility(const FName& QLName)
+{
+    if (!AbilityManager)
+    {
+        return;
+    }
+
+    AbilityManager->SetCurrentAbility(QLName);
 }
 
 //------------------------------------------------------------
@@ -376,6 +490,12 @@ float AQLCharacter::TakeDamage(float DamageAmount, FDamageEvent const& DamageEve
 {
     float ActualDamage = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
 
+    // if the character is already dead, no further damage
+    if (Health <= 0.0f)
+    {
+        return 0.0f;
+    }
+
     // handle point damage
     if (DamageEvent.GetTypeID() == FPointDamageEvent::ClassID)
     {
@@ -397,7 +517,7 @@ float AQLCharacter::TakeDamage(float DamageAmount, FDamageEvent const& DamageEve
         // also adjust damage according to ProtectionMultiplier
 
         float MinDamage = ProtectionMultiplier * RadialDamageEventPtr->Params.MinimumDamage;
-        float MaxDamage = RadialDamageEventPtr->Params.BaseDamage;
+        float MaxDamage = ProtectionMultiplier * RadialDamageEventPtr->Params.BaseDamage;
         ActualDamage = (MinDamage - MaxDamage) / RadialDamageEventPtr->Params.OuterRadius * Distance + MaxDamage;
 
         if (ActualDamage < 0.0f)
@@ -553,28 +673,60 @@ AQLPlayerController* AQLCharacter::GetQLPlayerController()
 //------------------------------------------------------------
 void AQLCharacter::SwitchToRocketLauncher()
 {
-    SetCurrentWeapon(FName(TEXT("RocketLauncher")));
+    if (bCanSwitchWeapon)
+    {
+        SetCurrentWeapon(FName(TEXT("RocketLauncher")));
+    }
 }
 
 //------------------------------------------------------------
 //------------------------------------------------------------
 void AQLCharacter::SwitchToLightningGun()
 {
-    SetCurrentWeapon(FName(TEXT("LightningGun")));
+    if (bCanSwitchWeapon)
+    {
+        SetCurrentWeapon(FName(TEXT("LightningGun")));
+    }
 }
 
 //------------------------------------------------------------
 //------------------------------------------------------------
 void AQLCharacter::SwitchToRailGun()
 {
-    SetCurrentWeapon(FName(TEXT("RailGun")));
+    if (bCanSwitchWeapon)
+    {
+        SetCurrentWeapon(FName(TEXT("RailGun")));
+    }
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLCharacter::SwitchToNailGun()
+{
+    if (bCanSwitchWeapon)
+    {
+        SetCurrentWeapon(FName(TEXT("NailGun")));
+    }
 }
 
 //------------------------------------------------------------
 //------------------------------------------------------------
 void AQLCharacter::SwitchToPortalGun()
 {
-    SetCurrentWeapon(FName(TEXT("PortalGun")));
+    if (bCanSwitchWeapon)
+    {
+        SetCurrentWeapon(FName(TEXT("PortalGun")));
+    }
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLCharacter::SwitchToGrenadeLauncher()
+{
+    if (bCanSwitchWeapon)
+    {
+        SetCurrentWeapon(FName(TEXT("GrenadeLauncher")));
+    }
 }
 
 //------------------------------------------------------------
@@ -587,8 +739,10 @@ void AQLCharacter::Die()
     float ActualAnimationLength = Animation->SequenceLength / Animation->RateScale;
     float DurationBeforeDestroyed = ActualAnimationLength + 3.0f;
 
-    GetCapsuleComponent()->SetCollisionProfileName(TEXT("NoCollision"));
-    GetCapsuleComponent()->SetEnableGravity(false);
+    PlaySoundFireAndForget(FName(TEXT("Die")));
+
+    // avoid blocking living characters
+    GetCapsuleComponent()->SetCollisionResponseToChannel(ECollisionChannel::ECC_Pawn, ECollisionResponse::ECR_Overlap);
 
     // destroy the character
     GetWorldTimerManager().SetTimer(DieTimerHandle,
@@ -723,4 +877,136 @@ void AQLCharacter::StopGlow()
     {
         WeaponManager->StopGlowWeapon();
     }
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLCharacter::SetCurrentWeaponVisibility(const bool bFlag)
+{
+    if (WeaponManager)
+    {
+        WeaponManager->SetCurrentWeaponVisibility(bFlag);
+    }
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+bool AQLCharacter::IsAlive()
+{
+    if (Health > 0.0f)
+    {
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLCharacter::OnUseAbility()
+{
+    if (!AbilityManager)
+    {
+        return;
+    }
+
+    AQLAbility* CurrentAbility = AbilityManager->GetCurrentAbility();
+    if (CurrentAbility)
+    {
+        CurrentAbility->OnUse();
+    }
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLCharacter::PlaySoundFireAndForget(const FName& SoundName)
+{
+    USoundBase** Result = SoundList.Find(SoundName);
+    if (Result)
+    {
+        USoundBase* Sound = *Result;
+        if (Sound)
+        {
+            UGameplayStatics::PlaySoundAtLocation(GetWorld(), Sound, GetActorLocation());
+        }
+    }
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLCharacter::PlaySound(const FName& SoundName)
+{
+    USoundBase** Result = SoundList.Find(SoundName);
+    if (Result)
+    {
+        USoundBase* Sound = *Result;
+        if (Sound)
+        {
+            SoundComponent->SetSound(Sound);
+            SoundComponent->Play(0.0f);
+
+            //// sound played using this function is fire and forget and does not travel with the actor
+            //UGameplayStatics::PlaySoundAtLocation(this, Sound, User->GetActorLocation());
+        }
+    }
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLCharacter::StopSound()
+{
+    if (SoundComponent)
+    {
+        if (SoundComponent->IsPlaying())
+        {
+            SoundComponent->Stop();
+        }
+    }
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLCharacter::SetFireEnabled(const bool bFlag)
+{
+    bCanFireAndAltFire = bFlag;
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLCharacter::SetSwitchWeaponEnabled(const bool bFlag)
+{
+    bCanSwitchWeapon = bFlag;
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+bool AQLCharacter::HasWeapon(const FName& WeaponName)
+{
+    if (!WeaponManager)
+    {
+        return false;
+    }
+
+    return WeaponManager->HasWeapon(WeaponName);
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+bool AQLCharacter::IsBot()
+{
+    AController* MyController = GetController();
+    if (!MyController)
+    {
+        return true;
+    }
+
+    APlayerController* MyPlayerController = Cast<APlayerController>(Controller);
+    if (!MyPlayerController)
+    {
+        return true;
+    }
+
+    return false;
 }

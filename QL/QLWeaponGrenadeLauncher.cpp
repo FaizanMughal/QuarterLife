@@ -9,46 +9,45 @@
 //------------------------------------------------------------
 
 
-#include "QLWeaponRocketLauncher.h"
-#include "QLRocketProjectile.h"
+#include "QLWeaponGrenadeLauncher.h"
+#include "QLRecyclerGrenadeProjectile.h"
 #include "QLWeaponManager.h"
 #include "QLCharacter.h"
 #include "QLUtility.h"
 #include "Engine/World.h"
 #include "Camera/CameraComponent.h"
-#include "QLRocketProjectile.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "QLPlayerController.h"
 #include "Kismet/GameplayStatics.h"
 
 //------------------------------------------------------------
 //------------------------------------------------------------
-AQLWeaponRocketLauncher::AQLWeaponRocketLauncher()
+AQLWeaponGrenadeLauncher::AQLWeaponGrenadeLauncher()
 {
-    QLName = FName(TEXT("RocketLauncher"));
-    RateOfFire = 0.8f;
-    RocketProjectileClass = AQLRocketProjectile::StaticClass();
+    QLName = FName(TEXT("GrenadeLauncher"));
+
+    RateOfFire = 1.0f;
+
+    RecyclerGrenadeProjectileClass = AQLRecyclerGrenadeProjectile::StaticClass();
 }
 
 //------------------------------------------------------------
 //------------------------------------------------------------
-void AQLWeaponRocketLauncher::PostInitializeComponents()
+void AQLWeaponGrenadeLauncher::PostInitializeComponents()
 {
     Super::PostInitializeComponents();
-
-    SetDamageMultiplier(1.0f);
 }
 
 //------------------------------------------------------------
 //------------------------------------------------------------
-void AQLWeaponRocketLauncher::Tick(float DeltaTime)
+void AQLWeaponGrenadeLauncher::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
 }
 
 //------------------------------------------------------------
 //------------------------------------------------------------
-void AQLWeaponRocketLauncher::OnFire()
+void AQLWeaponGrenadeLauncher::OnFire()
 {
     // if we are still in the fire disabled window, the weapon cannot be used
     if (!bFireEnabled)
@@ -59,12 +58,12 @@ void AQLWeaponRocketLauncher::OnFire()
     // enforce rate of fire
     bFireEnabled = false;
     GetWorldTimerManager().SetTimer(DisableFireTimerHandle,
-                                    this,
-                                    &AQLWeaponRocketLauncher::EnableFireCallBack,
-                                    1.0f, // time interval in second. since loop is not used,
-                                          // this parameter can be an arbitrary value except 0.0f.
-                                    false, // loop
-                                    RateOfFire); // delay in second
+        this,
+        &AQLWeaponGrenadeLauncher::EnableFireCallBack,
+        1.0f, // time interval in second. since loop is not used,
+              // this parameter can be an arbitrary value except 0.0f.
+        false, // loop
+        RateOfFire); // delay in second
 
     PlayAnimationMontage(FName(TEXT("Fire")));
 
@@ -106,10 +105,10 @@ void AQLWeaponRocketLauncher::OnFire()
     FMatrix result = FRotationMatrix::MakeFromXZ(ProjectileForwardVector, CameraComponent->GetUpVector());
     FRotator SourceRotation = result.Rotator();
 
-    // spawn and launch a rocket
+    // spawn and launch a grenade
     UWorld* const World = GetWorld();
 
-    if (RocketProjectileClass && World && WeaponManager.IsValid())
+    if (RecyclerGrenadeProjectileClass && World && WeaponManager.IsValid())
     {
         if (!User || !CameraComponent)
         {
@@ -117,17 +116,17 @@ void AQLWeaponRocketLauncher::OnFire()
         }
 
         FTransform MyTransform(SourceRotation, SourceLocation, FVector(1.0f));
-        AQLRocketProjectile* Rocket = World->SpawnActorDeferred<AQLRocketProjectile>(RocketProjectileClass, MyTransform);
+        AQLRecyclerGrenadeProjectile* RecyclerGrenade = World->SpawnActorDeferred<AQLRecyclerGrenadeProjectile>(RecyclerGrenadeProjectileClass, MyTransform);
 
-        // pass controller to rocket as damage instigator
+        // pass controller to RecyclerGrenade as damage instigator
         AController* Controller = User->GetController();
         AQLPlayerController* QLPlayerController = Cast<AQLPlayerController>(Controller);
-        Rocket->SetQLPlayerController(QLPlayerController);
-        Rocket->SetDamageMultiplier(DamageMultiplier);
-        UGameplayStatics::FinishSpawningActor(Rocket, MyTransform);
+        RecyclerGrenade->SetQLPlayerController(QLPlayerController);
+        RecyclerGrenade->SetDamageMultiplier(DamageMultiplier);
+        UGameplayStatics::FinishSpawningActor(RecyclerGrenade, MyTransform);
 
         // change velocity
-        FVector FinalVelocity = ProjectileForwardVector * Rocket->GetProjectileMovementComponent()->InitialSpeed;
-        Rocket->GetProjectileMovementComponent()->Velocity = FinalVelocity;
+        FVector FinalVelocity = ProjectileForwardVector * RecyclerGrenade->GetProjectileMovementComponent()->InitialSpeed;
+        RecyclerGrenade->GetProjectileMovementComponent()->Velocity = FinalVelocity;
     }
 }

@@ -51,6 +51,30 @@ public:
 
     UFUNCTION(BlueprintCallable, Category = "C++Function")
     FLinearColor GetGlowColor();
+
+    UFUNCTION(BlueprintCallable, Category = "C++Function")
+    FName GetQLName();
+
+    UFUNCTION(BlueprintCallable, Category = "C++Function")
+    UStaticMeshComponent* GetStaticMeshComponent();
+
+    //------------------------------------------------------------
+    //------------------------------------------------------------
+    UFUNCTION(BlueprintCallable, Category = "C++Function")
+    void ChangePhysicsSetup();
+
+    //------------------------------------------------------------
+    //------------------------------------------------------------
+    UFUNCTION(BlueprintCallable, Category = "C++Function")
+    void RevertPhysicsSetup();
+
+    //------------------------------------------------------------
+    // After Delay seconds, perform PerformRotationInterpCallback()
+    // which sets bStartRotationInterp to true, and performs rotation interpolation
+    // in Tick() until the rotation becomes FRotator::ZeroRotator
+    //------------------------------------------------------------
+    UFUNCTION(BlueprintCallable, Category = "C++Function")
+    void PerformRotationInterpWithDelay(const float Delay);
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
@@ -60,6 +84,21 @@ protected:
     //------------------------------------------------------------
     //------------------------------------------------------------
     virtual void PostInitializeComponents() override;
+
+    //------------------------------------------------------------
+    //------------------------------------------------------------
+    UFUNCTION()
+    virtual void OnComponentBeginOverlapImpl(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
+
+    //------------------------------------------------------------
+    //------------------------------------------------------------
+    UFUNCTION()
+    virtual void OnComponentHitImpl(UPrimitiveComponent* HitComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit);
+
+    //------------------------------------------------------------
+    //------------------------------------------------------------
+    UFUNCTION()
+    void PerformRotationInterpCallback();
 
     //------------------------------------------------------------
     //------------------------------------------------------------
@@ -84,6 +123,9 @@ protected:
     TMap<FName, USoundBase*> SoundList;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "C++Property")
+    USoundAttenuation* SoundAttenuation;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "C++Property")
     TMap<FName, UAnimMontage*> AnimationMontageList;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "C++Property")
@@ -104,4 +146,11 @@ protected:
     //------------------------------------------------------------
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "C++Property")
     FLinearColor GlowColor;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "C++Property")
+    FName QLName;
+
+    FTimerHandle StartRotationDelayTimerHandle;
+
+    bool bStartRotationInterp;
 };

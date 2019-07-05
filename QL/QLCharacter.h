@@ -18,6 +18,8 @@
 
 class AQLWeapon;
 class UQLWeaponManager;
+class AQLAbility;
+class UQLAbilityManager;
 class UWidgetComponent;
 class UQLPowerupManager;
 
@@ -41,6 +43,9 @@ public:
     // Returns FirstPersonMesh subobject
     UFUNCTION(BlueprintCallable, Category = "C++Function")
     USkeletalMeshComponent* GetFirstPersonMesh();
+
+    UFUNCTION(BlueprintCallable, Category = "C++Function")
+    USkeletalMeshComponent* GetThirdPersonMesh();
 
     // Returns FirstPersonCameraComponent subobject
     UFUNCTION(BlueprintCallable, Category = "C++Function")
@@ -67,7 +72,13 @@ public:
     void AddWeapon(AQLWeapon* Weapon);
 
     UFUNCTION(BlueprintCallable, Category = "C++Function")
-    void SetCurrentWeapon(const FName& WeaponName);
+    void SetCurrentWeapon(const FName& QLName);
+
+    UFUNCTION(BlueprintCallable, Category = "C++Function")
+    void AddAbility(AQLAbility* Ability);
+
+    UFUNCTION(BlueprintCallable, Category = "C++Function")
+    void SetCurrentAbility(const FName& QLName);
 
     UFUNCTION(BlueprintCallable, Category = "C++Function")
     bool AddPowerup(AQLPowerup* Powerup);
@@ -75,6 +86,10 @@ public:
     UFUNCTION(BlueprintCallable, Category = "C++Function")
     void RemovePowerup(AQLPowerup* Powerup);
 
+    //------------------------------------------------------------
+    // When the character dies, it is not immediately destroyed.
+    // There is a small duration reserved for animation.
+    //------------------------------------------------------------
     UFUNCTION(BlueprintCallable, Category = "C++Function")
     void Die();
 
@@ -82,13 +97,22 @@ public:
     void OnDie();
 
     UFUNCTION(BlueprintCallable, Category = "C++Function")
+    bool IsAlive();
+
+    UFUNCTION(BlueprintCallable, Category = "C++Function")
     float GetHealth() const;
+
+    UFUNCTION(BlueprintCallable, Category = "C++Function")
+    void AddHealth(float Increment);
 
     UFUNCTION(BlueprintCallable, Category = "C++Function")
     float GetMaxHealth() const;
 
     UFUNCTION(BlueprintCallable, Category = "C++Function")
     float GetArmor() const;
+
+    UFUNCTION(BlueprintCallable, Category = "C++Function")
+    void AddArmor(float Increment);
 
     UFUNCTION(BlueprintCallable, Category = "C++Function")
     float GetMaxArmor() const;
@@ -106,7 +130,19 @@ public:
     void StopGlow();
 
     UFUNCTION(BlueprintCallable, Category = "C++Function")
+    void SetFireEnabled(const bool bFlag);
+
+    UFUNCTION(BlueprintCallable, Category = "C++Function")
+    void SetSwitchWeaponEnabled(const bool bFlag);
+
+    UFUNCTION(BlueprintCallable, Category = "C++Function")
+    void SetCurrentWeaponVisibility(const bool bFlag);
+
+    UFUNCTION(BlueprintCallable, Category = "C++Function")
     virtual UAnimSequence* PlayAnimationSequence(const FName& AnimationSequenceName);
+
+    UFUNCTION(BlueprintCallable, Category = "C++Function")
+    bool HasWeapon(const FName& WeaponName);
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "C++Property")
     float Health;
@@ -120,6 +156,11 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "C++Property")
     float MaxArmor;
 
+    //------------------------------------------------------------
+    // Differentiate human player from AI bots
+    //------------------------------------------------------------
+    UFUNCTION(BlueprintCallable, Category = "C++Function")
+    bool IsBot();
 protected:
 
     // Pawn mesh : 1st person view(arms; seen only by self)
@@ -201,6 +242,25 @@ protected:
 
     UFUNCTION(BlueprintCallable, Category = "C++Function")
     void SwitchToPortalGun();
+
+    UFUNCTION(BlueprintCallable, Category = "C++Function")
+    void SwitchToGrenadeLauncher();
+
+    UFUNCTION(BlueprintCallable, Category = "C++Function")
+    void SwitchToNailGun();
+
+    // Fires a projectile.
+    UFUNCTION(BlueprintCallable, Category = "C++Function")
+    void OnUseAbility();
+
+    UFUNCTION(BlueprintCallable, Category = "C++Function")
+    void PlaySoundFireAndForget(const FName& SoundName);
+
+    UFUNCTION(BlueprintCallable, Category = "C++Function")
+    void PlaySound(const FName& SoundName);
+
+    UFUNCTION(BlueprintCallable, Category = "C++Function")
+    void StopSound();
 protected:
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "C++Property")
@@ -208,6 +268,9 @@ protected:
 
     UPROPERTY()
     UQLWeaponManager* WeaponManager;
+
+    UPROPERTY()
+    UQLAbilityManager* AbilityManager;
 
     UPROPERTY()
     UQLPowerupManager* PowerupManager;
@@ -221,6 +284,23 @@ protected:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "C++Property")
     TMap<FName, UAnimSequence*> AnimationSequenceList;
 
-
     FTimerHandle DieTimerHandle;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "C++Property")
+    UAudioComponent* SoundComponent;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "C++Property")
+    TMap<FName, USoundBase*> SoundList;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "C++Property")
+    TArray<TSubclassOf<AQLWeapon>> WeaponClassList;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "C++Property")
+    TArray<TSubclassOf<AQLAbility>> AbilityClassList;
+
+    UPROPERTY()
+    bool bCanFireAndAltFire;
+
+    UPROPERTY()
+    bool bCanSwitchWeapon;
 };

@@ -17,7 +17,7 @@
 #include "GameFramework/DamageType.h"
 #include "Components/AudioComponent.h"
 #include "QLWeaponManager.h"
-#include "QLUmgUserWidget.h"
+#include "QLUmgFirstPerson.h"
 #include "QLPlayerController.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -26,7 +26,7 @@
 //------------------------------------------------------------
 AQLWeaponLightningGun::AQLWeaponLightningGun()
 {
-    WeaponName = FName("LightningGun");
+    QLName = FName(TEXT("LightningGun"));
     HitRange = 1200.0f;
     RateOfFire = 0.05f;
     bIsFireHeld = false;
@@ -66,7 +66,7 @@ void AQLWeaponLightningGun::Tick(float DeltaTime)
 //------------------------------------------------------------
 void AQLWeaponLightningGun::OnFire()
 {
-    PlaySound(FName("Fire"));
+    PlaySound(FName(TEXT("Fire")));
 
     bIsFireHeld = true;
 
@@ -76,9 +76,9 @@ void AQLWeaponLightningGun::OnFire()
         BeamComponent->Activate();
     }
 
-    GetWorldTimerManager().SetTimer(HeldDownFireTimerHandle,
+    GetWorldTimerManager().SetTimer(HoldFireTimerHandle,
                                     this,
-                                    &AQLWeaponLightningGun::HitTarget,
+                                    &AQLWeaponLightningGun::SpawnLightning,
                                     RateOfFire, // time interval in second
                                     true, // loop
                                     0.0f); // delay in second
@@ -97,7 +97,7 @@ void AQLWeaponLightningGun::OnFireRelease()
         BeamComponent->Deactivate();
     }
 
-    GetWorldTimerManager().ClearTimer(HeldDownFireTimerHandle);
+    GetWorldTimerManager().ClearTimer(HoldFireTimerHandle);
 }
 
 //------------------------------------------------------------
@@ -136,7 +136,7 @@ void AQLWeaponLightningGun::OnFireHold()
 
 //------------------------------------------------------------
 //------------------------------------------------------------
-void AQLWeaponLightningGun::HitTarget()
+void AQLWeaponLightningGun::SpawnLightning()
 {
     AQLCharacter* User = GetWeaponManager()->GetUser();
 
@@ -175,8 +175,8 @@ void AQLWeaponLightningGun::HitTarget()
     // create a damage event
     const FPointDamageEvent DamageEvent;
 
-    const float DamageAmount = BasicDamageAdjusted;
-    hitActor->TakeDamage(DamageAmount, DamageEvent, User->GetController(), this);
+    float DamageAmount = BasicDamageAdjusted;
+    DamageAmount = hitActor->TakeDamage(DamageAmount, DamageEvent, User->GetController(), this);
 
     // change victim velocity
     UCharacterMovementComponent* CharacterMovementComponent = hitActor->GetCharacterMovement();
@@ -189,7 +189,7 @@ void AQLWeaponLightningGun::HitTarget()
 
     // display damage
     AQLPlayerController* QLPlayerController = User->GetQLPlayerController();
-    if (QLPlayerController)
+    if (DamageAmount > 0.0f && QLPlayerController)
     {
         QLPlayerController->ShowDamageOnScreen(DamageAmount, HitResult.ImpactPoint);
     }

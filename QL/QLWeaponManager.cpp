@@ -44,21 +44,21 @@ AQLCharacter* UQLWeaponManager::GetUser()
 
 //------------------------------------------------------------
 //------------------------------------------------------------
-void UQLWeaponManager::SetCurrentWeapon(const FName& WeaponName)
+void UQLWeaponManager::SetCurrentWeapon(const FName& QLName)
 {
     // find if the named weapon is in the inventory
     AQLWeapon* WeaponWanted = nullptr;
 
     for (const auto& Item : WeaponList)
     {
-        if (WeaponName == Item->GetWeaponName())
+        if (QLName == Item->GetQLName())
         {
             WeaponWanted = Item;
             break;
         }
     }
 
-    // if it is not, do thing
+    // if it is not, do nothing
     if (!WeaponWanted)
     {
         return;
@@ -127,7 +127,7 @@ void UQLWeaponManager::AddWeapon(AQLWeapon* Weapon)
     // if the weapon is already in the list, do not add
     for (auto& Item : WeaponList)
     {
-        if (Item->GetWeaponName() == Weapon->GetWeaponName())
+        if (Item->GetQLName() == Weapon->GetQLName())
         {
             QLUtility::Log("UQLWeaponManager:: Weapon of the same type has already been added.");
             return;
@@ -145,8 +145,11 @@ void UQLWeaponManager::AddWeapon(AQLWeapon* Weapon)
     }
 
     auto* gunMesh = Weapon->GetGunSkeletalMeshComponent();
-    gunMesh->CastShadow = false;
-    gunMesh->bCastDynamicShadow = false;
+    if (gunMesh)
+    {
+        gunMesh->CastShadow = false;
+        gunMesh->bCastDynamicShadow = false;
+    }
 
     Weapon->GetGunSkeletalMeshComponent()->SetVisibility(false);
     Weapon->SetActorEnableCollision(false);
@@ -198,3 +201,45 @@ void UQLWeaponManager::StopGlowWeapon()
         Item->StopGlow();
     }
 }
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void UQLWeaponManager::CreateAndAddAllWeapons(const TArray<TSubclassOf<AQLWeapon>>& WeaponClassList)
+{
+    if (!User.IsValid())
+    {
+        return;
+    }
+
+    for (const auto& Item : WeaponClassList)
+    {
+        auto* Weapon = GetWorld()->SpawnActor<AQLWeapon>(Item, FVector::ZeroVector, FRotator::ZeroRotator);
+        AddWeapon(Weapon);
+    }
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void UQLWeaponManager::SetCurrentWeaponVisibility(const bool bFlag)
+{
+    if (CurrentWeapon.IsValid())
+    {
+        CurrentWeapon->GetGunSkeletalMeshComponent()->SetVisibility(bFlag);
+    }
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+bool UQLWeaponManager::HasWeapon(const FName& WeaponName)
+{
+    for (auto& Item : WeaponList)
+    {
+        if (Item->GetQLName() == WeaponName)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+

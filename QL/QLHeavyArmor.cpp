@@ -8,17 +8,14 @@
 // (")-(")o
 //------------------------------------------------------------
 
-#pragma once
 
-#include "CoreMinimal.h"
-#include "QLAbility.h"
-#include "QLAbilityHealingRain.generated.h"
+#include "QLHeavyArmor.h"
+#include "QLCharacter.h"
 
 //------------------------------------------------------------
 //------------------------------------------------------------
-UCLASS()
-class QL_API AQLAbilityHealingRain : public AQLAbility
+AQLHeavyArmor::AQLHeavyArmor()
 {
-	GENERATED_BODY()
 
-};
+}
+

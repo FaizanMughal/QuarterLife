@@ -11,7 +11,6 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "GameFramework/Actor.h"
 #include "QLPickup.h"
 #include "QLWeapon.generated.h"
 
@@ -60,9 +59,6 @@ public:
     FVector GetMuzzleLocation();
 
     UFUNCTION(BlueprintCallable, Category = "C++Function")
-    FName GetWeaponName();
-
-    UFUNCTION(BlueprintCallable, Category = "C++Function")
     void SetHitRange(float HitRange);
 
     UFUNCTION(BlueprintCallable, Category = "C++Function")
@@ -95,8 +91,7 @@ protected:
 
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
-    UFUNCTION(BlueprintCallable, Category = "C++Function")
-    void OnComponentBeginOverlapImpl(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
+    void OnComponentBeginOverlapImpl(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult) override;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "C++Property")
     TMap<FName, UTexture2D*> CrosshairTextureList;
@@ -114,10 +109,7 @@ protected:
     UPROPERTY()
     TWeakObjectPtr<UMaterialInstanceDynamic> DynamicMaterialGun;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "C++Property")
-    FName WeaponName;
-
-    FTimerHandle HeldDownFireTimerHandle;
+    FTimerHandle HoldFireTimerHandle;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "C++Property")
     float HitRange;
@@ -135,6 +127,12 @@ protected:
 
     UPROPERTY()
     bool bFireEnabled;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "C++Property")
+    float BasicDamage;
+
+    UPROPERTY()
+    float BasicDamageAdjusted;
 
     UPROPERTY()
     float DamageMultiplier;

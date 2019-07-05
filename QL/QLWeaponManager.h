@@ -34,7 +34,7 @@ public:
 
     void AddWeapon(AQLWeapon* Weapon);
 
-    void SetCurrentWeapon(const FName& WeaponName);
+    void SetCurrentWeapon(const FName& QLName);
 
     void UpdateCrossHair();
 
@@ -45,6 +45,12 @@ public:
     void StartGlowWeapon(const FLinearColor& Color);
 
     void StopGlowWeapon();
+
+    void CreateAndAddAllWeapons(const TArray<TSubclassOf<AQLWeapon>>& WeaponClassList);
+
+    void SetCurrentWeaponVisibility(const bool bFlag);
+
+    bool HasWeapon(const FName& WeaponName);
 protected:
     // do not use UPROPERTY() here
     // it breaks the character weapon system

@@ -36,10 +36,7 @@ AQLPickup::AQLPickup()
     RootSphereComponent = CreateDefaultSubobject<USphereComponent>(TEXT("RootSphereComponent"));
     RootSphereComponent->InitSphereRadius(40.0f);
     RootSphereComponent->SetSimulatePhysics(false);
-    RootSphereComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-    RootSphereComponent->SetCollisionObjectType(ECollisionChannel::ECC_WorldDynamic);
-    RootSphereComponent->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Ignore);
-    RootSphereComponent->SetCollisionResponseToChannel(ECollisionChannel::ECC_Pawn, ECollisionResponse::ECR_Overlap);
+    RootSphereComponent->SetCollisionProfileName(TEXT("OverlapAllDynamic"));
     RootComponent = RootSphereComponent;
 
     StaticMeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("StaticMeshComponent"));
@@ -54,6 +51,8 @@ AQLPickup::AQLPickup()
     bConstantlyRotating = true;
     RespawnInterval = 0.0f;
     GlowColor = FLinearColor(0.0f, 0.0f, 1.0f);
+
+    bStartRotationInterp = false;
 }
 
 //------------------------------------------------------------
@@ -94,6 +93,18 @@ void AQLPickup::Tick(float DeltaTime)
         Rotator.Add(Increment.Pitch, Increment.Yaw, Increment.Roll);
         SetActorRotation(Rotator);
     }
+
+    // interp rotation
+    if (bStartRotationInterp)
+    {
+        FRotator NewRotation = FMath::RInterpConstantTo(GetActorRotation(), FRotator::ZeroRotator, DeltaTime, 100.0f);
+        SetActorRotation(NewRotation);
+
+        if (GetActorRotation().Equals(FRotator::ZeroRotator))
+        {
+            bStartRotationInterp = false;
+        }
+    }
 }
 
 //------------------------------------------------------------
@@ -107,6 +118,20 @@ void AQLPickup::PostInitializeComponents()
         UMaterialInterface* BasicMaterial = StaticMeshComponent->GetMaterial(0);
         DynamicMaterial = StaticMeshComponent->CreateAndSetMaterialInstanceDynamicFromMaterial(0, BasicMaterial);
         StaticMeshComponent->SetMaterial(0, DynamicMaterial.Get());
+    }
+
+    if (RootSphereComponent)
+    {
+        RootSphereComponent->OnComponentBeginOverlap.RemoveDynamic(this, &AQLPickup::OnComponentBeginOverlapImpl);
+        RootSphereComponent->OnComponentBeginOverlap.AddDynamic(this, &AQLPickup::OnComponentBeginOverlapImpl);
+
+        RootSphereComponent->OnComponentHit.RemoveDynamic(this, &AQLPickup::OnComponentHitImpl);
+        RootSphereComponent->OnComponentHit.AddDynamic(this, &AQLPickup::OnComponentHitImpl);
+    }
+
+    if (SoundComponent && SoundAttenuation)
+    {
+        SoundComponent->AttenuationSettings = SoundAttenuation;
     }
 }
 
@@ -126,9 +151,17 @@ void AQLPickup::PlaySoundFireAndForget(const FName& SoundName)
     if (Result)
     {
         USoundBase* Sound = *Result;
-        if (Sound)
+
+        if (Sound && SoundAttenuation)
         {
-            UGameplayStatics::PlaySoundAtLocation(GetWorld(), Sound, GetActorLocation());
+            UGameplayStatics::PlaySoundAtLocation(GetWorld(),
+                Sound,
+                GetActorLocation(),
+                GetActorRotation(),
+                1.0f, // VolumeMultiplier
+                1.0f, // PitchMultiplier
+                0.0f, // StartTime
+                SoundAttenuation);
         }
     }
 }
@@ -145,9 +178,6 @@ void AQLPickup::PlaySound(const FName& SoundName)
         {
             SoundComponent->SetSound(Sound);
             SoundComponent->Play(0.0f);
-
-            //// sound played using this function is fire and forget and does not travel with the actor
-            //UGameplayStatics::PlaySoundAtLocation(this, Sound, User->GetActorLocation());
         }
     }
 }
@@ -184,4 +214,76 @@ USphereComponent* AQLPickup::GetRootSphereComponent()
 FLinearColor AQLPickup::GetGlowColor()
 {
     return GlowColor;
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+FName AQLPickup::GetQLName()
+{
+    return QLName;
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+UStaticMeshComponent* AQLPickup::GetStaticMeshComponent()
+{
+    return StaticMeshComponent;
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLPickup::OnComponentBeginOverlapImpl(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+{
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLPickup::OnComponentHitImpl(UPrimitiveComponent* HitComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit)
+{
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLPickup::ChangePhysicsSetup()
+{
+    if (RootSphereComponent)
+    {
+        RootSphereComponent->SetSimulatePhysics(true);
+        RootSphereComponent->SetCollisionProfileName(TEXT("PhysicsActor"));
+        RootSphereComponent->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+        RootSphereComponent->SetNotifyRigidBodyCollision(true); // equivalently BP Simulation Generates Hit Events
+        RootSphereComponent->SetLinearDamping(1.0f);
+        RootSphereComponent->SetAngularDamping(1.0f);
+    }
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLPickup::RevertPhysicsSetup()
+{
+    if (RootSphereComponent)
+    {
+        RootSphereComponent->SetSimulatePhysics(false);
+        RootSphereComponent->SetCollisionProfileName(TEXT("OverlapAllDynamic"));
+        RootSphereComponent->SetNotifyRigidBodyCollision(false); // equivalently BP Simulation Generates Hit Events
+    }
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLPickup::PerformRotationInterpWithDelay(const float Delay)
+{
+    GetWorldTimerManager().SetTimer(StartRotationDelayTimerHandle,
+        this,
+        &AQLPickup::PerformRotationInterpCallback,
+        1.0f, // time interval in second
+        false, // loop
+        Delay); // delay in second
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLPickup::PerformRotationInterpCallback()
+{
+    bStartRotationInterp = true;
 }

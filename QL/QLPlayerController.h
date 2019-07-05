@@ -12,8 +12,10 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
-#include "QLUmgUserWidget.h"
 #include "QLPlayerController.generated.h"
+
+class UQLUmgFirstPerson;
+class UQLUmgInventory;
 
 //------------------------------------------------------------
 //------------------------------------------------------------
@@ -37,14 +39,19 @@ public:
     void AddUMG();
 
     UFUNCTION(BlueprintCallable, Category = "C++Function")
-    UQLUmgUserWidget* GetUMG();
+    UQLUmgFirstPerson* GetUMG();
 
     UPROPERTY(EditDefaultsOnly, Category = "C++Property")
-    TSubclassOf<UQLUmgUserWidget> UmgUserWidgetClass;
+    TSubclassOf<UQLUmgFirstPerson> UmgFirstPersonClass;
+
+    UPROPERTY(EditDefaultsOnly, Category = "C++Property")
+    TSubclassOf<UQLUmgInventory> UmgInventoryClass;
 
     UFUNCTION(BlueprintCallable, Category = "C++Function")
     void ShowDamageOnScreen(float DamageAmount, const FVector& WorldTextLocation);
 
+    UFUNCTION(BlueprintCallable, Category = "C++Function")
+    void ShowAbilityMenu();
 protected:
     //------------------------------------------------------------
     //------------------------------------------------------------
@@ -58,8 +65,15 @@ protected:
     //------------------------------------------------------------
     virtual void OnPossess(APawn* ControlledPawn) override;
 
+    //------------------------------------------------------------
+    //------------------------------------------------------------
+    virtual void SetupInputComponent() override;
+
     UPROPERTY()
-    UQLUmgUserWidget* UmgUserWidget;
+    UQLUmgFirstPerson* UmgFirstPerson;
+
+    UPROPERTY()
+    UQLUmgInventory* UmgInventory;
 
     float FPS;
 };

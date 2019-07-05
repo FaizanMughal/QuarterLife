@@ -46,13 +46,21 @@ protected:
 
     //------------------------------------------------------------
     //------------------------------------------------------------
-    UFUNCTION(BlueprintCallable, Category = "C++Function")
-    void OnComponentBeginOverlapImpl(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
+    void OnComponentBeginOverlapImpl(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult) override;
+
+    //------------------------------------------------------------
+    //------------------------------------------------------------
+    virtual void UpdateProgressOnUMGInternal(const float Value);
 
     //------------------------------------------------------------
     //------------------------------------------------------------
     UFUNCTION(BlueprintCallable, Category = "C++Function")
     virtual void UpdateProgressOnUMG();
+
+    //------------------------------------------------------------
+    //------------------------------------------------------------
+    UFUNCTION(BlueprintCallable, Category = "C++Function")
+    virtual void SetUMGVisibility(const bool bFlag);
 
     //------------------------------------------------------------
     //------------------------------------------------------------
@@ -92,6 +100,7 @@ protected:
 
     float ProgressPercent;
     float TimeElapsed;
+    float ProgressUpdateTimeIncrement;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "C++Property")
     FName PowerupName;

@@ -11,14 +11,18 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "QLAbility.h"
-#include "QLAbilityHealingRain.generated.h"
+#include "QLHealth.h"
+#include "QLMegaHealth.generated.h"
 
 //------------------------------------------------------------
 //------------------------------------------------------------
 UCLASS()
-class QL_API AQLAbilityHealingRain : public AQLAbility
+class QL_API AQLMegaHealth : public AQLHealth
 {
 	GENERATED_BODY()
 
+public:
+    AQLMegaHealth();
+
+protected:
 };

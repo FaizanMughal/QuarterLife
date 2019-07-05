@@ -12,7 +12,7 @@
 #include "QLPowerup.h"
 #include "QLPlayerController.h"
 #include "QLCharacter.h"
-#include "QLUmgUserWidget.h"
+#include "QLUmgFirstPerson.h"
 #include "QLPowerupManager.h"
 #include "Components/SphereComponent.h"
 
@@ -23,8 +23,7 @@ AQLPowerup::AQLPowerup()
     bCanBeRespawned = true;
     RespawnInterval = 120.0f;
     EffectDuration = 30.0f;
-
-    RootSphereComponent->OnComponentBeginOverlap.AddDynamic(this, &AQLPowerup::OnComponentBeginOverlapImpl);
+    ProgressUpdateTimeIncrement = 0.1f;
 }
 
 //------------------------------------------------------------
@@ -84,7 +83,7 @@ void AQLPowerup::OnComponentBeginOverlapImpl(UPrimitiveComponent* OverlappedComp
             GetWorldTimerManager().SetTimer(EffectStartTimerHandle,
                 this,
                 &AQLPowerup::UpdateProgressOnUMG,
-                0.1f, // time interval in second
+                ProgressUpdateTimeIncrement, // time interval in second
                 true, // loop
                 0.0f); // delay in second
 
@@ -137,16 +136,37 @@ void AQLPowerup::Deactivate()
 void AQLPowerup::OnEffectEnd()
 {
     GetWorldTimerManager().ClearTimer(EffectEndTimerHandle);
+    GetWorldTimerManager().ClearTimer(EffectStartTimerHandle);
 
-    Beneficiary->RemovePowerup(this);
+    if (Beneficiary.IsValid())
+    {
+        Beneficiary->RemovePowerup(this);
+        UpdateProgressOnUMGInternal(0.0f);
+    }
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLPowerup::UpdateProgressOnUMGInternal(const float Value)
+{
+
 }
 
 //------------------------------------------------------------
 //------------------------------------------------------------
 void AQLPowerup::UpdateProgressOnUMG()
 {
-    TimeElapsed += 0.1f;
+    TimeElapsed += ProgressUpdateTimeIncrement;
     ProgressPercent = 1.0f - TimeElapsed / EffectDuration;
+
+    ProgressPercent = ProgressPercent < 0.0f ? 0.0f : ProgressPercent;
+    ProgressPercent = ProgressPercent > 1.0f ? 1.0f : ProgressPercent;
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLPowerup::SetUMGVisibility(const bool bFlag)
+{
 }
 
 //------------------------------------------------------------

@@ -18,14 +18,14 @@
 #include "GameFramework/DamageType.h"
 #include "Components/AudioComponent.h"
 #include "QLWeaponManager.h"
-#include "QLUmgUserWidget.h"
+#include "QLUmgFirstPerson.h"
 #include "QLPlayerController.h"
 
 //------------------------------------------------------------
 //------------------------------------------------------------
 AQLWeaponRailGun::AQLWeaponRailGun()
 {
-    WeaponName = FName("RailGun");
+    QLName = FName(TEXT("RailGun"));
     HitRange = 1e5f;
     RateOfFire = 1.5f;
 
@@ -79,9 +79,9 @@ void AQLWeaponRailGun::OnFire()
                                     false, // loop
                                     RateOfFire); // delay in second
 
-    PlayAnimationMontage(FName("Fire"));
+    PlayAnimationMontage(FName(TEXT("Fire")));
 
-    PlaySoundFireAndForget(FName("Fire"));
+    PlaySoundFireAndForget(FName(TEXT("Fire")));
 
     // create the transient beam actor
     UParticleSystemComponent* BeamComponentTemp = nullptr;
@@ -89,9 +89,11 @@ void AQLWeaponRailGun::OnFire()
 
     if (RailBeamClass)
     {
+        // to do: destroy this actor!!!
         RailBeamTemp = GetWorld()->SpawnActor<AQLRailBeam>(RailBeamClass, GetMuzzleLocation(), FRotator::ZeroRotator);
         if (RailBeamTemp)
         {
+            RailBeamTemp->SetActorEnableCollision(false);
             BeamComponentTemp = RailBeamTemp->GetBeamComponent();
             if (BeamComponentTemp)
             {
@@ -145,13 +147,13 @@ void AQLWeaponRailGun::OnFire()
     // create a damage event
     const FPointDamageEvent DamageEvent;
 
-    hitActor->TakeDamage(CurrentDamage, DamageEvent, User->GetController(), this);
+    float DamageAmount = hitActor->TakeDamage(CurrentDamage, DamageEvent, User->GetController(), this);
 
     // display damage
     AQLPlayerController* QLPlayerController = User->GetQLPlayerController();
-    if (QLPlayerController)
+    if (DamageAmount > 0.0f && QLPlayerController)
     {
-        QLPlayerController->ShowDamageOnScreen(CurrentDamage, HitResult.ImpactPoint);
+        QLPlayerController->ShowDamageOnScreen(DamageAmount, HitResult.ImpactPoint);
     }
 }
 
@@ -192,7 +194,7 @@ void AQLWeaponRailGun::OnAltFire()
     }
 
     // sound
-    PlaySound(FName("Zoom"));
+    PlaySound(FName(TEXT("Zoom")));
 }
 
 //------------------------------------------------------------

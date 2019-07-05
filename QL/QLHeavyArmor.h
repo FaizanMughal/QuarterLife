@@ -11,14 +11,18 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "QLAbility.h"
-#include "QLAbilityHealingRain.generated.h"
+#include "QLArmor.h"
+#include "QLHeavyArmor.generated.h"
 
 //------------------------------------------------------------
 //------------------------------------------------------------
 UCLASS()
-class QL_API AQLAbilityHealingRain : public AQLAbility
+class QL_API AQLHeavyArmor : public AQLArmor
 {
 	GENERATED_BODY()
 
+public:
+    AQLHeavyArmor();
+
+protected:
 };

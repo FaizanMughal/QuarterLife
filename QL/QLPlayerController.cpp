@@ -12,6 +12,9 @@
 #include "QLPlayerController.h"
 #include "QLUtility.h"
 #include "QLCharacter.h"
+#include "QLUmgFirstPerson.h"
+#include "QLUmgInventory.h"
+#include "Kismet/GameplayStatics.h"
 
 //------------------------------------------------------------
 //------------------------------------------------------------
@@ -19,8 +22,11 @@ AQLPlayerController::AQLPlayerController() :
 FPS(0.0f)
 {
     // ui
-    UmgUserWidgetClass = UQLUmgUserWidget::StaticClass();
-    UmgUserWidget = nullptr;
+    UmgFirstPersonClass = UQLUmgFirstPerson::StaticClass();
+    UmgFirstPerson = nullptr;
+
+    UmgInventoryClass = UQLUmgInventory::StaticClass();
+    UmgInventory = nullptr;
 }
 
 //------------------------------------------------------------
@@ -63,18 +69,21 @@ void AQLPlayerController::Tick(float DeltaSeconds)
 //------------------------------------------------------------
 void AQLPlayerController::AddUMG()
 {
-    UmgUserWidget = CreateWidget<UQLUmgUserWidget>(GetWorld(), UmgUserWidgetClass, FName("UmgUserWidget"));
-    UmgUserWidget->SetQLPlayerController(this);
-    UmgUserWidget->AddToViewport();
+    UmgFirstPerson = CreateWidget<UQLUmgFirstPerson>(GetWorld(), UmgFirstPersonClass, FName(TEXT("UmgFirstPerson")));
+    UmgFirstPerson->SetQLPlayerController(this);
+    UmgFirstPerson->AddToViewport();
     bShowMouseCursor = false;
     SetInputMode(FInputModeGameOnly());
+
+    UmgInventory = CreateWidget<UQLUmgInventory>(GetWorld(), UmgInventoryClass, FName(TEXT("UmgInventory")));
+    UmgInventory->SetQLPlayerController(this);
 }
 
 //------------------------------------------------------------
 //------------------------------------------------------------
-UQLUmgUserWidget* AQLPlayerController::GetUMG()
+UQLUmgFirstPerson* AQLPlayerController::GetUMG()
 {
-    return UmgUserWidget;
+    return UmgFirstPerson;
 }
 
 //------------------------------------------------------------
@@ -105,10 +114,10 @@ void AQLPlayerController::OnPossess(APawn* ControlledPawn)
 
         AddUMG();
 
-        if (UmgUserWidget)
+        if (UmgFirstPerson)
         {
-            UmgUserWidget->UpdateTextHealthValue(ControlledCharacter->GetHealth());
-            UmgUserWidget->UpdateTextArmorValue(ControlledCharacter->GetArmor());
+            UmgFirstPerson->UpdateTextHealthValue(ControlledCharacter->GetHealth());
+            UmgFirstPerson->UpdateTextArmorValue(ControlledCharacter->GetArmor());
         }
     }
 }
@@ -117,12 +126,39 @@ void AQLPlayerController::OnPossess(APawn* ControlledPawn)
 //------------------------------------------------------------
 void AQLPlayerController::ShowDamageOnScreen(float DamageAmount, const FVector& WorldTextLocation)
 {
-    if (!UmgUserWidget)
+    if (!UmgFirstPerson)
     {
         return;
     }
 
     int32 DamageAmountInt = FMath::RoundToInt(DamageAmount);
-    UmgUserWidget->ShowDamageOnScreen(FString::FromInt(DamageAmountInt), WorldTextLocation);
+    UmgFirstPerson->ShowDamageOnScreen(FString::FromInt(DamageAmountInt), WorldTextLocation);
 }
 
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLPlayerController::ShowAbilityMenu()
+{
+    if (UmgInventory && !UmgInventory->IsInViewport())
+    {
+        UmgInventory->AddToViewport();
+
+        bShowMouseCursor = true;
+        SetInputMode(FInputModeUIOnly());
+        UmgInventory->bIsFocusable = true;
+        UmgInventory->SetKeyboardFocus();
+
+        // slow down time
+        float TimeDilation = 0.1f;
+        UGameplayStatics::SetGlobalTimeDilation(GetWorld(), TimeDilation);
+    }
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLPlayerController::SetupInputComponent()
+{
+    Super::SetupInputComponent();
+
+    InputComponent->BindAction("AbilityMenu", EInputEvent::IE_Pressed, this, &AQLPlayerController::ShowAbilityMenu);
+}
