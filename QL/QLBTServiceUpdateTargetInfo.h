@@ -11,31 +11,22 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "QLPickup.h"
-#include "QLHealth.generated.h"
-
-class AQLCharacter;
+#include "BehaviorTree/Services/BTService_BlackboardBase.h"
+#include "QLBTServiceUpdateTargetInfo.generated.h"
 
 //------------------------------------------------------------
 //------------------------------------------------------------
 UCLASS()
-class QL_API AQLHealth : public AQLPickup
+class QL_API UQLBTServiceUpdateTargetInfo : public UBTService_BlackboardBase
 {
-	GENERATED_BODY()
+    GENERATED_BODY()
 
 public:
-    AQLHealth();
-
-protected:
     //------------------------------------------------------------
     //------------------------------------------------------------
-    UFUNCTION()
-    void Respawn();
+    UQLBTServiceUpdateTargetInfo(const FObjectInitializer& ObjectInitializer);
 
     //------------------------------------------------------------
     //------------------------------------------------------------
-    virtual void OnComponentBeginOverlapImpl(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult) override;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "C++Property")
-    float HealthIncrement;
+    virtual void TickNode(UBehaviorTreeComponent& OwnerComp, uint8 * NodeMemory, float DeltaSeconds) override;
 };

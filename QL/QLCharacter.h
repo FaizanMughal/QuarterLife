@@ -22,8 +22,22 @@ class AQLAbility;
 class UQLAbilityManager;
 class UWidgetComponent;
 class UQLPowerupManager;
+class UAIPerceptionStimuliSourceComponent;
 
 //------------------------------------------------------------
+// In Blueprint,
+// Set up the collision:
+//     Capsule
+//         collision preset : custom
+//         collision enabled: query and physics,
+//         object type : pawn
+//         collision responses : ignore camera
+//
+//     Third person mesh
+//         collision preset : custom
+//         collision enabled: query only,
+//         object type : pawn
+//         collision responses : block camera
 //------------------------------------------------------------
 UCLASS()
 class QL_API AQLCharacter : public ACharacter
@@ -75,6 +89,9 @@ public:
     void SetCurrentWeapon(const FName& QLName);
 
     UFUNCTION(BlueprintCallable, Category = "C++Function")
+    AQLWeapon* GetCurrentWeapon();
+
+    UFUNCTION(BlueprintCallable, Category = "C++Function")
     void AddAbility(AQLAbility* Ability);
 
     UFUNCTION(BlueprintCallable, Category = "C++Function")
@@ -86,15 +103,14 @@ public:
     UFUNCTION(BlueprintCallable, Category = "C++Function")
     void RemovePowerup(AQLPowerup* Powerup);
 
-    //------------------------------------------------------------
-    // When the character dies, it is not immediately destroyed.
-    // There is a small duration reserved for animation.
-    //------------------------------------------------------------
     UFUNCTION(BlueprintCallable, Category = "C++Function")
     void Die();
 
     UFUNCTION(BlueprintCallable, Category = "C++Function")
     void OnDie();
+
+    UFUNCTION(BlueprintCallable, Category = "C++Function")
+    void OnRespawnNewCharacter();
 
     UFUNCTION(BlueprintCallable, Category = "C++Function")
     bool IsAlive();
@@ -129,14 +145,11 @@ public:
     UFUNCTION(BlueprintCallable, Category = "C++Function")
     void StopGlow();
 
+    //------------------------------------------------------------
+    // Enable or disable weapon switch, fire and alt fire
+    //------------------------------------------------------------
     UFUNCTION(BlueprintCallable, Category = "C++Function")
-    void SetFireEnabled(const bool bFlag);
-
-    UFUNCTION(BlueprintCallable, Category = "C++Function")
-    void SetSwitchWeaponEnabled(const bool bFlag);
-
-    UFUNCTION(BlueprintCallable, Category = "C++Function")
-    void SetCurrentWeaponVisibility(const bool bFlag);
+    void SetWeaponEnabled(const bool bFlag);
 
     UFUNCTION(BlueprintCallable, Category = "C++Function")
     virtual UAnimSequence* PlayAnimationSequence(const FName& AnimationSequenceName);
@@ -160,7 +173,61 @@ public:
     // Differentiate human player from AI bots
     //------------------------------------------------------------
     UFUNCTION(BlueprintCallable, Category = "C++Function")
-    bool IsBot();
+    bool GetIsBot();
+
+    UFUNCTION(BlueprintCallable, Category = "C++Function")
+    void SetIsBot(bool bFlag);
+
+    UFUNCTION(BlueprintCallable, Category = "C++Function")
+    void SetMaxWalkSpeed(const float MaxWalkSpeed);
+
+    UFUNCTION(BlueprintCallable, Category = "C++Function")
+    void ResetMaxWalkSpeed();
+
+    // Fires a projectile.
+    UFUNCTION(BlueprintCallable, Category = "C++Function")
+    void OnFire();
+
+    UFUNCTION(BlueprintCallable, Category = "C++Function")
+    void OnFireRelease();
+
+    UFUNCTION(BlueprintCallable, Category = "C++Function")
+    void OnAltFire();
+
+    UFUNCTION(BlueprintCallable, Category = "C++Function")
+    void OnAltFireRelease();
+
+    UFUNCTION(BlueprintCallable, Category = "C++Function")
+    bool QLGetVisibility();
+
+    //------------------------------------------------------------
+    // Enable or disable the visibility of the first person mesh,
+    // third person mesh, and weapon mesh
+    //------------------------------------------------------------
+    UFUNCTION(BlueprintCallable, Category = "C++Function")
+    void QLSetVisibility(const bool bFlag);
+
+    UFUNCTION(BlueprintCallable, Category = "C++Function")
+    bool QLGetVulnerability();
+
+    //------------------------------------------------------------
+    // Enable or disable the visibility of the first person mesh,
+    // third person mesh, and weapon mesh
+    //------------------------------------------------------------
+    UFUNCTION(BlueprintCallable, Category = "C++Function")
+    void QLSetVulnerability(const bool bFlag);
+
+    virtual void Jump() override;
+
+    virtual void StopJumping() override;
+
+    UFUNCTION(BlueprintCallable, Category = "C++Function")
+    bool IsJumpButtonDown();
+
+    UFUNCTION(BlueprintCallable, Category = "C++Function")
+    void EquipAll();
+
+    virtual void FellOutOfWorld(const UDamageType& dmgType) override;
 protected:
 
     // Pawn mesh : 1st person view(arms; seen only by self)
@@ -189,9 +256,6 @@ protected:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "C++Property")
     float BaseLookUpRate;
 
-    // Projectile class to spawn
-    // UPROPERTY(EditDefaultsOnly, Category = Projectile)
-    // TSubclassOf<class ATestFirstPersonProjectile> ProjectileClass;
 protected:
     // Called when the game starts or when spawned
     virtual void BeginPlay() override;
@@ -214,22 +278,6 @@ protected:
     // Called via input to turn look up/down at a given rate.
     // This is a normalized rate, i.e. 1.0 means 100% of desired turn rate
     void LookUpAtRate(float Rate);
-
-    // Fires a projectile.
-    UFUNCTION(BlueprintCallable, Category = "C++Function")
-    void OnFire();
-
-    UFUNCTION(BlueprintCallable, Category = "C++Function")
-    void OnFireRelease();
-
-    UFUNCTION(BlueprintCallable, Category = "C++Function")
-    void OnAltFire();
-
-    UFUNCTION(BlueprintCallable, Category = "C++Function")
-    void OnAltFireRelease();
-
-    UFUNCTION(BlueprintCallable, Category = "C++Function")
-    void OnRestartLevel();
 
     UFUNCTION(BlueprintCallable, Category = "C++Function")
     void SwitchToRocketLauncher();
@@ -261,8 +309,10 @@ protected:
 
     UFUNCTION(BlueprintCallable, Category = "C++Function")
     void StopSound();
-protected:
 
+    UFUNCTION(BlueprintCallable, Category = "C++Function")
+    void RespawnCharacterRandomly();
+protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "C++Property")
     UWidgetComponent* PlayerHealthArmorBarWidgetComponent;
 
@@ -286,6 +336,8 @@ protected:
 
     FTimerHandle DieTimerHandle;
 
+    FTimerHandle RespawnTimerHandle;
+
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "C++Property")
     UAudioComponent* SoundComponent;
 
@@ -303,4 +355,26 @@ protected:
 
     UPROPERTY()
     bool bCanSwitchWeapon;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "C++Property")
+    UAIPerceptionStimuliSourceComponent* AIPerceptionStimuliSourceComponent;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "C++Property")
+    bool bQLIsVisible;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "C++Property")
+    bool bQLIsVulnerable;
+
+    // monitor jump status for animation purpose
+    UPROPERTY()
+    bool bJumpButtonDown;
+
+    UPROPERTY()
+    bool bQLIsBot;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "C++Property")
+    float DurationAfterDeathBeforeDestroyed;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "C++Property")
+    float DurationAfterDeathBeforeRespawn;
 };

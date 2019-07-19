@@ -39,13 +39,14 @@ public:
     UProjectileMovementComponent* GetProjectileMovementComponent();
 
     UFUNCTION(BlueprintCallable, Category = "C++Function")
-    void SetQLPlayerController(AQLPlayerController* PlayerControllerExt);
+    void QLSetPlayerController(AQLPlayerController* PlayerControllerExt);
 
     UFUNCTION(BlueprintCallable, Category = "C++Function")
     void SetDamageMultiplier(const float Value);
 
     UFUNCTION(BlueprintCallable, Category = "C++Function")
     void PlaySoundFireAndForget(const FName& SoundName);
+
 protected:
     //------------------------------------------------------------
 	// Called when the game starts or when spawned
@@ -78,9 +79,6 @@ protected:
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "C++Property")
     float ProjectileLifeSpan;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "C++Property")
-    float ProjectileSpeed;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "C++Property")
     float BlastRadius;

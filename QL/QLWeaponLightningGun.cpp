@@ -32,7 +32,7 @@ AQLWeaponLightningGun::AQLWeaponLightningGun()
     bIsFireHeld = false;
 
     BasicDamage = 6.0f;
-    KnockbackSpeedChange = 30.0f;
+    KnockbackSpeedChange = 50.0f;
 }
 
 //------------------------------------------------------------
@@ -66,6 +66,11 @@ void AQLWeaponLightningGun::Tick(float DeltaTime)
 //------------------------------------------------------------
 void AQLWeaponLightningGun::OnFire()
 {
+    if (bIsFireHeld)
+    {
+        return;
+    }
+
     PlaySound(FName(TEXT("Fire")));
 
     bIsFireHeld = true;
@@ -88,6 +93,11 @@ void AQLWeaponLightningGun::OnFire()
 //------------------------------------------------------------
 void AQLWeaponLightningGun::OnFireRelease()
 {
+    if (!bIsFireHeld)
+    {
+        return;
+    }
+
     StopSound();
 
     bIsFireHeld = false;
@@ -191,13 +201,14 @@ void AQLWeaponLightningGun::SpawnLightning()
     AQLPlayerController* QLPlayerController = User->GetQLPlayerController();
     if (DamageAmount > 0.0f && QLPlayerController)
     {
+        PlaySoundFireAndForget("Hit");
         QLPlayerController->ShowDamageOnScreen(DamageAmount, HitResult.ImpactPoint);
     }
 }
 
 //------------------------------------------------------------
 //------------------------------------------------------------
-void AQLWeaponLightningGun::PrepareForImpendingWeaponSwitch()
+void AQLWeaponLightningGun::StopFire()
 {
     // stop firing
     if (bIsFireHeld)

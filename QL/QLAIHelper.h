@@ -11,31 +11,40 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "QLPickup.h"
-#include "QLHealth.generated.h"
+#include "GameFramework/Actor.h"
+#include "QLAIHelper.generated.h"
 
 class AQLCharacter;
 
 //------------------------------------------------------------
 //------------------------------------------------------------
 UCLASS()
-class QL_API AQLHealth : public AQLPickup
+class QL_API AQLAIHelper : public AActor
 {
 	GENERATED_BODY()
 
 public:
-    AQLHealth();
+	// Sets default values for this actor's properties
+	AQLAIHelper();
+protected:
+	// Called when the game starts or when spawned
+	virtual void BeginPlay() override;
+
+    virtual void PostInitializeComponents() override;
+
+    //------------------------------------------------------------
+    //------------------------------------------------------------
+    UFUNCTION(BlueprintCallable, Category = "C++Function")
+    void SpawnBots();
+
+public:
+	// Called every frame
+	virtual void Tick(float DeltaTime) override;
 
 protected:
-    //------------------------------------------------------------
-    //------------------------------------------------------------
-    UFUNCTION()
-    void Respawn();
-
-    //------------------------------------------------------------
-    //------------------------------------------------------------
-    virtual void OnComponentBeginOverlapImpl(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult) override;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "C++Property")
+    int NumBotsToSpawn;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "C++Property")
-    float HealthIncrement;
+    TSubclassOf<AQLCharacter> CharacterClass;
 };

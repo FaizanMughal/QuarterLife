@@ -20,6 +20,7 @@
 #include "QLWeaponManager.h"
 #include "QLUmgFirstPerson.h"
 #include "QLPlayerController.h"
+#include "GameFramework/CharacterMovementComponent.h"
 
 //------------------------------------------------------------
 //------------------------------------------------------------
@@ -42,6 +43,8 @@ AQLWeaponRailGun::AQLWeaponRailGun()
     // animation
     ZoomTimeline = CreateDefaultSubobject<UTimelineComponent>(TEXT("ZoomTimeline"));
     ZoomTimelineInterpFunction.BindUFunction(this, FName{ TEXT("ZoomCallback") });
+
+    KnockbackSpeedChange = 600.0f;
 }
 
 //------------------------------------------------------------
@@ -89,7 +92,8 @@ void AQLWeaponRailGun::OnFire()
 
     if (RailBeamClass)
     {
-        // to do: destroy this actor!!!
+        // AQLRailBeam object is automatically destroyed after the particle effect ends
+        // because AQLRailBeam lifespan is specified in its BeginPlay()
         RailBeamTemp = GetWorld()->SpawnActor<AQLRailBeam>(RailBeamClass, GetMuzzleLocation(), FRotator::ZeroRotator);
         if (RailBeamTemp)
         {
@@ -149,10 +153,20 @@ void AQLWeaponRailGun::OnFire()
 
     float DamageAmount = hitActor->TakeDamage(CurrentDamage, DamageEvent, User->GetController(), this);
 
+    // change victim velocity
+    UCharacterMovementComponent* CharacterMovementComponent = hitActor->GetCharacterMovement();
+    if (CharacterMovementComponent)
+    {
+        CharacterMovementComponent->AddImpulse(
+            -HitResult.ImpactNormal * KnockbackSpeedChange, // impulse vector
+            true); // velocity change (true) or impulse (false)
+    }
+
     // display damage
     AQLPlayerController* QLPlayerController = User->GetQLPlayerController();
     if (DamageAmount > 0.0f && QLPlayerController)
     {
+        PlaySoundFireAndForget("Hit");
         QLPlayerController->ShowDamageOnScreen(DamageAmount, HitResult.ImpactPoint);
     }
 }
@@ -244,7 +258,7 @@ void AQLWeaponRailGun::ZoomCallback(float Val)
 
 //------------------------------------------------------------
 //------------------------------------------------------------
-void AQLWeaponRailGun::PrepareForImpendingWeaponSwitch()
+void AQLWeaponRailGun::StopFire()
 {
     // reset fov
     if (ZoomTimeline->IsPlaying())
@@ -266,5 +280,14 @@ void AQLWeaponRailGun::SetDamageMultiplier(const float Value)
 
     BasicDamageAdjusted = Value * BasicDamage;
     ZoomDamageAdjusted = Value * ZoomDamage;
-    CurrentDamage *= Value;
+
+    if (bZoomedIn)
+    {
+        CurrentDamage = ZoomDamageAdjusted;
+    }
+    else
+    {
+        CurrentDamage = BasicDamageAdjusted;
+    }
+
 }

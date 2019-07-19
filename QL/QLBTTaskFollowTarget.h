@@ -11,31 +11,22 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "QLPickup.h"
-#include "QLHealth.generated.h"
-
-class AQLCharacter;
+#include "BehaviorTree/Tasks/BTTask_BlackboardBase.h"
+#include "QLBTTaskFollowTarget.generated.h"
 
 //------------------------------------------------------------
 //------------------------------------------------------------
 UCLASS()
-class QL_API AQLHealth : public AQLPickup
+class QL_API UQLBTTaskFollowTarget : public UBTTask_BlackboardBase
 {
 	GENERATED_BODY()
 
 public:
-    AQLHealth();
-
-protected:
     //------------------------------------------------------------
     //------------------------------------------------------------
-    UFUNCTION()
-    void Respawn();
+    UQLBTTaskFollowTarget(const FObjectInitializer& ObjectInitializer);
 
     //------------------------------------------------------------
     //------------------------------------------------------------
-    virtual void OnComponentBeginOverlapImpl(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult) override;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "C++Property")
-    float HealthIncrement;
+    virtual EBTNodeResult::Type ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory) override;
 };

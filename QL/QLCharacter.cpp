@@ -31,6 +31,15 @@
 #include "QLUmgFirstPerson.h"
 #include "QLUmgInventory.h"
 #include "Components/AudioComponent.h"
+#include "QLAIController.h"
+#include "Classes/Perception/AIPerceptionStimuliSourceComponent.h"
+#include "Classes/Perception/AISense.h"
+#include "Classes/Perception/AISense_Sight.h"
+#include "Classes/Perception/AISense_Hearing.h"
+#include "Classes/Perception/AISense_Prediction.h"
+#include "Classes/Perception/AISense_Damage.h"
+#include "Classes/Perception/AISense_Team.h"
+#include "NavigationSystem.h"
 
 //------------------------------------------------------------
 // Sets default values
@@ -55,11 +64,11 @@ AQLCharacter::AQLCharacter()
     BaseLookUpRate = 45.0f;
 
     // Create a CameraComponent
-    FirstPersonCameraComponent = CreateDefaultSubobject<UCameraComponent>(TEXT("FirstPersonCamera"));
+    FirstPersonCameraComponent = CreateDefaultSubobject<UCameraComponent>(TEXT("FirstPersonCameraComponent"));
     FirstPersonCameraComponent->SetupAttachment(GetCapsuleComponent());
     //FirstPersonCameraComponent->RelativeLocation = FVector(-39.56f, 1.75f, 64.f); // Position the camera
-    FirstPersonCameraComponent->RelativeLocation = FVector(-10.0f, 1.75f, 64.f);
-    FirstPersonCameraComponent->bUsePawnControlRotation = true;
+    FirstPersonCameraComponent->RelativeLocation = FVector(-10.0f, 1.75f, 64.0f);
+    FirstPersonCameraComponent->bUsePawnControlRotation = true; // critical! If false, mouse would not change pitch!
     FirstPersonCameraComponent->SetFieldOfView(100.0f);
 
     // Create a mesh component that will be used when being viewed from a '1st person' view (when controlling this pawn)
@@ -74,7 +83,9 @@ AQLCharacter::AQLCharacter()
     // third person
     ThirdPersonMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("ThirdPersonMesh"));
     ThirdPersonMesh->SetupAttachment(GetCapsuleComponent());
-    ThirdPersonMesh->SetCollisionProfileName(TEXT("NoCollision"));
+    ThirdPersonMesh->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+    ThirdPersonMesh->SetCollisionObjectType(ECollisionChannel::ECC_Pawn);
+    ThirdPersonMesh->SetCollisionResponseToChannel(ECollisionChannel::ECC_Camera, ECollisionResponse::ECR_Block);
     ThirdPersonMesh->bOwnerNoSee = true;
     ThirdPersonMesh->CastShadow = true;
     ThirdPersonMesh->bCastDynamicShadow = true;
@@ -88,6 +99,31 @@ AQLCharacter::AQLCharacter()
     PlayerHealthArmorBarWidgetComponent = CreateDefaultSubobject<UWidgetComponent>(TEXT("PlayerHealthArmorBarWidgetComponent"));
     PlayerHealthArmorBarWidgetComponent->SetupAttachment(GetCapsuleComponent());
     PlayerHealthArmorBarWidgetComponent->SetWidgetSpace(EWidgetSpace::Screen);
+
+    // ai
+    AIPerceptionStimuliSourceComponent = CreateDefaultSubobject<UAIPerceptionStimuliSourceComponent>(TEXT("AIPerceptionStimuliSourceComponent"));
+    AIPerceptionStimuliSourceComponent->RegisterForSense(UAISense_Sight::StaticClass());
+    AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
+    AIControllerClass = AQLAIController::StaticClass();
+
+    bQLIsVisible = true;
+    bQLIsVulnerable = true;
+
+    bJumpButtonDown = false;
+
+    bQLIsBot = false;
+
+    // capsule
+    // in order to achieve good hitbox, let ray-trace occur to the third person skeletal mesh rather than the capsule
+    GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+    GetCapsuleComponent()->SetCollisionObjectType(ECollisionChannel::ECC_Pawn);
+    GetCapsuleComponent()->SetCollisionResponseToChannel(ECollisionChannel::ECC_Camera, ECollisionResponse::ECR_Ignore);
+
+    DurationAfterDeathBeforeDestroyed = 3.0f;
+    DurationAfterDeathBeforeRespawn = 2.5f;
+
+    // movement
+    GetCharacterMovement()->AirControl = 0.5;
 }
 
 //------------------------------------------------------------
@@ -99,16 +135,6 @@ void AQLCharacter::BeginPlay()
 
     UpdateHealth();
     UpdateArmor();
-
-    if (WeaponManager)
-    {
-        WeaponManager->CreateAndAddAllWeapons(WeaponClassList);
-    }
-
-    if (AbilityManager)
-    {
-        AbilityManager->CreateAndAddAllAbilities(AbilityClassList);
-    }
 }
 
 //------------------------------------------------------------
@@ -143,6 +169,9 @@ void AQLCharacter::PostInitializeComponents()
         DynamicMaterialThirdPersonMesh = ThirdPersonMesh->CreateAndSetMaterialInstanceDynamicFromMaterial(0, BasicMaterial);
         ThirdPersonMesh->SetMaterial(0, DynamicMaterialThirdPersonMesh.Get());
     }
+
+    QLSetVisibility(bQLIsVisible);
+    QLSetVulnerability(bQLIsVulnerable);
 }
 
 //------------------------------------------------------------
@@ -177,8 +206,6 @@ void AQLCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
     PlayerInputComponent->BindAction("SwitchToPortalGun", EInputEvent::IE_Pressed, this, &AQLCharacter::SwitchToPortalGun);
     PlayerInputComponent->BindAction("SwitchToGrenadeLauncher", EInputEvent::IE_Pressed, this, &AQLCharacter::SwitchToGrenadeLauncher);
 
-    PlayerInputComponent->BindAction("RestartLevel", EInputEvent::IE_Pressed, this, &AQLCharacter::OnRestartLevel);
-
     PlayerInputComponent->BindAction("UseAbility", EInputEvent::IE_Pressed, this, &AQLCharacter::OnUseAbility);
 
     // Bind movement events
@@ -189,6 +216,31 @@ void AQLCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
     // "turn" handles devices that provide an absolute delta, such as a mouse.
     PlayerInputComponent->BindAxis("Turn", this, &APawn::AddControllerYawInput);
     PlayerInputComponent->BindAxis("LookUp", this, &APawn::AddControllerPitchInput);
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLCharacter::Jump()
+{
+    Super::Jump();
+
+    bJumpButtonDown = true;
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLCharacter::StopJumping()
+{
+    Super::StopJumping();
+
+    bJumpButtonDown = false;
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+bool AQLCharacter::IsJumpButtonDown()
+{
+    return bJumpButtonDown;
 }
 
 //------------------------------------------------------------
@@ -447,6 +499,18 @@ void AQLCharacter::SetCurrentWeapon(const FName& QLName)
 
 //------------------------------------------------------------
 //------------------------------------------------------------
+AQLWeapon* AQLCharacter::GetCurrentWeapon()
+{
+    if (!WeaponManager)
+    {
+        return nullptr;
+    }
+
+    return WeaponManager->GetCurrentWeapon();
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
 void AQLCharacter::SetCurrentAbility(const FName& QLName)
 {
     if (!AbilityManager)
@@ -470,7 +534,8 @@ FHitResult AQLCharacter::RayTraceFromCharacterPOV(float rayTraceRange)
     FVector end = FirstPersonCameraComponent->GetForwardVector() * rayTraceRange + start;
 
     FHitResult hitResult(ForceInit);
-    GetWorld()->LineTraceSingleByChannel(hitResult, start, end, ECC_Pawn, params);
+    // only hit the object that reponds to ray-trace, i.e. ECollisionChannel::ECC_Camera is set to ECollisionResponse::ECR_Block
+    GetWorld()->LineTraceSingleByChannel(hitResult, start, end, ECollisionChannel::ECC_Camera, params);
 
     // useful properties
     // hitResult.bBlockingHit  // did ray hit something
@@ -489,6 +554,35 @@ FHitResult AQLCharacter::RayTraceFromCharacterPOV(float rayTraceRange)
 float AQLCharacter::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
 {
     float ActualDamage = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
+
+    // bot sense damage
+    if (GetIsBot())
+    {
+        if (EventInstigator)
+        {
+            auto* MyPawn = EventInstigator->GetPawn();
+            if (MyPawn)
+            {
+                auto* Enemy = Cast<AQLCharacter>(MyPawn);
+                if (Enemy)
+                {
+                    UAISense_Damage::ReportDamageEvent(
+                        GetWorld(),
+                        this, // AActor* DamagedActor
+                        Enemy, // AActor* Instigator: somehow this argument must be the player who initiates the damage, not the controller
+                        ActualDamage,
+                        Enemy->GetActorLocation(), // EventLocation: will be reported as Instigator's location at the moment of event happening
+                        GetActorLocation() // HitLocation
+                    );
+                }
+            }
+        }
+    }
+
+    if (!bQLIsVulnerable)
+    {
+        return 0.0f;
+    }
 
     // if the character is already dead, no further damage
     if (Health <= 0.0f)
@@ -529,6 +623,15 @@ float AQLCharacter::TakeDamage(float DamageAmount, FDamageEvent const& DamageEve
     if (ActualDamage > 0.0f)
     {
         TakeDamageQuakeStyle(ActualDamage);
+
+        UpdateArmor();
+
+        UpdateHealth();
+
+        if (Health <= 0.0f)
+        {
+            Die();
+        }
     }
 
     return ActualDamage;
@@ -557,8 +660,6 @@ void AQLCharacter::TakeDamageQuakeStyle(float ActualDamage)
             Armor = RemainingAmor;
         }
 
-        UpdateArmor();
-
         // calculate health
         float RemainingHealth = Health - HealthDamage;
         if (RemainingHealth < 0.0f)
@@ -568,13 +669,6 @@ void AQLCharacter::TakeDamageQuakeStyle(float ActualDamage)
         else
         {
             Health = RemainingHealth;
-        }
-
-        UpdateHealth();
-
-        if (Health <= 0.0f)
-        {
-            Die();
         }
     }
 }
@@ -641,13 +735,6 @@ void AQLCharacter::UpdateArmor()
     {
         QLPlayerController->GetUMG()->UpdateTextArmorValue(Armor);
     }
-}
-
-//------------------------------------------------------------
-//------------------------------------------------------------
-void AQLCharacter::OnRestartLevel()
-{
-    UGameplayStatics::OpenLevel(GetWorld(), "QLArena");
 }
 
 //------------------------------------------------------------
@@ -733,16 +820,21 @@ void AQLCharacter::SwitchToGrenadeLauncher()
 //------------------------------------------------------------
 void AQLCharacter::Die()
 {
+    if (WeaponManager)
+    {
+        WeaponManager->DestroyAllWeapon();
+    }
+
     UAnimSequence* Animation = PlayAnimationSequence("Death1");
 
     // get animation length
-    float ActualAnimationLength = Animation->SequenceLength / Animation->RateScale;
-    float DurationBeforeDestroyed = ActualAnimationLength + 3.0f;
+    // float ActualAnimationLength = Animation->SequenceLength / Animation->RateScale;
 
     PlaySoundFireAndForget(FName(TEXT("Die")));
 
     // avoid blocking living characters
     GetCapsuleComponent()->SetCollisionResponseToChannel(ECollisionChannel::ECC_Pawn, ECollisionResponse::ECR_Overlap);
+    ThirdPersonMesh->SetCollisionResponseToChannel(ECollisionChannel::ECC_Pawn, ECollisionResponse::ECR_Overlap);
 
     // destroy the character
     GetWorldTimerManager().SetTimer(DieTimerHandle,
@@ -750,7 +842,19 @@ void AQLCharacter::Die()
         &AQLCharacter::OnDie,
         1.0f, // time interval in second
         false, // loop
-        DurationBeforeDestroyed); // delay in second
+        DurationAfterDeathBeforeDestroyed); // delay in second
+
+    // respawn the character
+    constexpr float DurationBeforeRespawn = 2.0f;
+    GetWorldTimerManager().SetTimer(RespawnTimerHandle,
+        this,
+        &AQLCharacter::OnRespawnNewCharacter,
+        1.0f, // time interval in second
+        false, // loop
+        DurationAfterDeathBeforeRespawn); // delay in second
+
+    // prevent dead character from still being controlled
+    DetachFromControllerPendingDestroy();
 }
 
 //------------------------------------------------------------
@@ -758,6 +862,13 @@ void AQLCharacter::Die()
 void AQLCharacter::OnDie()
 {
     Destroy();
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLCharacter::OnRespawnNewCharacter()
+{
+    RespawnCharacterRandomly();
 }
 
 //------------------------------------------------------------
@@ -881,16 +992,6 @@ void AQLCharacter::StopGlow()
 
 //------------------------------------------------------------
 //------------------------------------------------------------
-void AQLCharacter::SetCurrentWeaponVisibility(const bool bFlag)
-{
-    if (WeaponManager)
-    {
-        WeaponManager->SetCurrentWeaponVisibility(bFlag);
-    }
-}
-
-//------------------------------------------------------------
-//------------------------------------------------------------
 bool AQLCharacter::IsAlive()
 {
     if (Health > 0.0f)
@@ -968,15 +1069,9 @@ void AQLCharacter::StopSound()
 
 //------------------------------------------------------------
 //------------------------------------------------------------
-void AQLCharacter::SetFireEnabled(const bool bFlag)
+void AQLCharacter::SetWeaponEnabled(const bool bFlag)
 {
     bCanFireAndAltFire = bFlag;
-}
-
-//------------------------------------------------------------
-//------------------------------------------------------------
-void AQLCharacter::SetSwitchWeaponEnabled(const bool bFlag)
-{
     bCanSwitchWeapon = bFlag;
 }
 
@@ -994,19 +1089,142 @@ bool AQLCharacter::HasWeapon(const FName& WeaponName)
 
 //------------------------------------------------------------
 //------------------------------------------------------------
-bool AQLCharacter::IsBot()
+bool AQLCharacter::GetIsBot()
 {
-    AController* MyController = GetController();
-    if (!MyController)
+    return bQLIsBot;
+}
+
+//------------------------------------------------------------
+//-----------------------------------------------------------
+void AQLCharacter::SetIsBot(bool bFlag)
+{
+    bQLIsBot = bFlag;
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLCharacter::SetMaxWalkSpeed(const float MaxWalkSpeed)
+{
+    auto* MyCharacterMovement = GetCharacterMovement();
+    if (MyCharacterMovement)
     {
-        return true;
+        MyCharacterMovement->MaxWalkSpeed = MaxWalkSpeed;
+    }
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLCharacter::ResetMaxWalkSpeed()
+{
+    auto* MyCharacterMovement = GetCharacterMovement();
+    if (MyCharacterMovement)
+    {
+        MyCharacterMovement->MaxWalkSpeed = 600.0f;
+    }
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+bool AQLCharacter::QLGetVisibility()
+{
+    return bQLIsVisible;
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLCharacter::QLSetVisibility(const bool bFlag)
+{
+    if (FirstPersonMesh)
+    {
+        FirstPersonMesh->SetVisibility(bFlag);
     }
 
-    APlayerController* MyPlayerController = Cast<APlayerController>(Controller);
-    if (!MyPlayerController)
+    if (ThirdPersonMesh)
     {
-        return true;
+        ThirdPersonMesh->SetVisibility(bFlag);
     }
 
-    return false;
+    if (WeaponManager)
+    {
+        WeaponManager->SetCurrentWeaponVisibility(bFlag);
+    }
+
+    bQLIsVisible = bFlag;
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+bool AQLCharacter::QLGetVulnerability()
+{
+    return bQLIsVulnerable;
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLCharacter::QLSetVulnerability(const bool bFlag)
+{
+    bQLIsVulnerable = bFlag;
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLCharacter::EquipAll()
+{
+    if (WeaponManager)
+    {
+        WeaponManager->CreateAndAddAllWeapons(WeaponClassList);
+    }
+
+    if (AbilityManager)
+    {
+        AbilityManager->CreateAndAddAllAbilities(AbilityClassList);
+    }
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLCharacter::RespawnCharacterRandomly()
+{
+    UNavigationSystemV1* NavSys = UNavigationSystemV1::GetCurrent(GetWorld());
+
+    if (NavSys)
+    {
+        FNavLocation RandomLocation;
+        bool bFound = NavSys->GetRandomPoint(RandomLocation);
+        if (!bFound)
+        {
+            return;
+        }
+        RandomLocation.Location.Z += 100.0f;
+
+        FRotator RandomYawRotation = FRotator(0.0f, FMath::RandRange(0.0f, 360.0f), 0.0f);
+
+        FTransform RandomTransform(RandomYawRotation, RandomLocation.Location, FVector(1.0f));
+
+        // deferred spawn in order to timely specify human/bot identity
+        AQLCharacter* NewCharacter = GetWorld()->SpawnActorDeferred<AQLCharacter>(GetClass(), RandomTransform, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn);
+        if (bQLIsBot)
+        {
+            NewCharacter->SetIsBot(true);
+        }
+        else
+        {
+            NewCharacter->SetIsBot(false);
+        }
+        UGameplayStatics::FinishSpawningActor(NewCharacter, RandomTransform);
+
+        NewCharacter->EquipAll();
+
+        if (!bQLIsBot)
+        {
+            UGameplayStatics::GetPlayerController(GetWorld(), 0)->Possess(NewCharacter);
+        }
+    }
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLCharacter::FellOutOfWorld(const UDamageType& dmgType)
+{
+    Die();
 }

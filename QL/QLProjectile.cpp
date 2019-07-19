@@ -32,13 +32,13 @@ AQLProjectile::AQLProjectile()
 
     RootSphereComponent = CreateDefaultSubobject<USphereComponent>(TEXT("RootSphereComponent"));
     RootSphereComponent->InitSphereRadius(20.0f);
-    RootSphereComponent->SetCollisionProfileName(TEXT("OverlapAllDynamic"));
+    RootSphereComponent->SetCollisionObjectType(ECollisionChannel::ECC_WorldDynamic);
+    RootSphereComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+    RootSphereComponent->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Overlap);
     RootComponent = RootSphereComponent;
 
     ProjectileMovementComponent = CreateDefaultSubobject<UProjectileMovementComponent>(TEXT("ProjectileMovementComponent"));
     ProjectileMovementComponent->UpdatedComponent = RootSphereComponent;
-    ProjectileMovementComponent->InitialSpeed = ProjectileSpeed;
-    ProjectileMovementComponent->MaxSpeed = ProjectileSpeed;
     ProjectileMovementComponent->SetVelocityInLocalSpace(FVector(0.0f, 0.0f, 0.0f));
 
     StaticMeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("StaticMeshComponent"));
@@ -47,7 +47,6 @@ AQLProjectile::AQLProjectile()
 
     ExplosionParticleSystem = nullptr;
     ProjectileLifeSpan = 5.0f;
-    ProjectileSpeed = 1000.0f;
     BlastRadius = 400.0f;
     BlastSpeedChange = 1200.0f;
     BasicDamage = 100.0f;
@@ -64,9 +63,6 @@ AQLProjectile::AQLProjectile()
 void AQLProjectile::BeginPlay()
 {
     Super::BeginPlay();
-
-    ProjectileMovementComponent->InitialSpeed = ProjectileSpeed;
-    ProjectileMovementComponent->MaxSpeed = ProjectileSpeed;
 
     SetLifeSpan(ProjectileLifeSpan);
 }
@@ -130,6 +126,7 @@ void AQLProjectile::HandleDirectHit(AActor* OtherActor, bool& bSelfDirectHit, bo
         // display damage
         if (DamageAmount > 0.0f && PlayerController.IsValid())
         {
+            PlaySoundFireAndForget("Hit");
             PlayerController->ShowDamageOnScreen(DamageAmount, Character->GetActorLocation());
         }
 
@@ -158,6 +155,14 @@ void AQLProjectile::HandleSplashHit(AActor* OtherActor, bool bDirectHit)
     for (auto&& Result : OutOverlaps)
     {
         TWeakObjectPtr<UPrimitiveComponent> Comp = Result.Component;
+
+        // two components of the character can be registered: the capsule and the third person mesh
+        // to avoid splash damage being applied to a character twice, we single out the third person component
+        if (!Comp.IsValid() || !Cast<USkeletalMeshComponent>(Comp))
+        {
+            continue;
+        }
+
         AActor* Actor = Comp->GetOwner();
         if (Actor)
         {
@@ -212,6 +217,11 @@ void AQLProjectile::HandleSplashHit(AActor* OtherActor, bool bDirectHit)
                 // display positive damage
                 if (DamageAmount > 0.0f && PlayerController.IsValid())
                 {
+                    if (Character != PlayerController->GetCharacter())
+                    {
+                        PlaySoundFireAndForget("Hit");
+                    }
+
                     PlayerController->ShowDamageOnScreen(DamageAmount, Character->GetActorLocation());
                 }
             }
@@ -254,7 +264,7 @@ void AQLProjectile::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 //------------------------------------------------------------
 //------------------------------------------------------------
-void AQLProjectile::SetQLPlayerController(AQLPlayerController* PlayerControllerExt)
+void AQLProjectile::QLSetPlayerController(AQLPlayerController* PlayerControllerExt)
 {
     PlayerController = PlayerControllerExt;
 }
@@ -263,7 +273,7 @@ void AQLProjectile::SetQLPlayerController(AQLPlayerController* PlayerControllerE
 //------------------------------------------------------------
 float AQLProjectile::ReduceSelfDamage(const float InDamage)
 {
-    return InDamage * 0.5;
+    return InDamage * 0.3;
 }
 
 //------------------------------------------------------------

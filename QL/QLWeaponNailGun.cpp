@@ -29,6 +29,8 @@ AQLWeaponNailGun::AQLWeaponNailGun()
     NailProjectileClass = AQLNailProjectile::StaticClass();
 
     bIsFireHeld = false;
+    bIsProjectileWeapon = true;
+    ProjectileSpeed = 1500.0f;
 }
 
 //------------------------------------------------------------
@@ -45,17 +47,17 @@ void AQLWeaponNailGun::PostInitializeComponents()
 void AQLWeaponNailGun::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
-
-    if (bIsFireHeld)
-    {
-        OnFireHold();
-    }
 }
 
 //------------------------------------------------------------
 //------------------------------------------------------------
 void AQLWeaponNailGun::OnFire()
 {
+    if (bIsFireHeld)
+    {
+        return;
+    }
+
     bIsFireHeld = true;
 
     GetWorldTimerManager().SetTimer(HoldFireTimerHandle,
@@ -70,6 +72,11 @@ void AQLWeaponNailGun::OnFire()
 //------------------------------------------------------------
 void AQLWeaponNailGun::OnFireRelease()
 {
+    if (!bIsFireHeld)
+    {
+        return;
+    }
+
     bIsFireHeld = false;
 
     GetWorldTimerManager().ClearTimer(HoldFireTimerHandle);
@@ -84,7 +91,7 @@ void AQLWeaponNailGun::OnFireHold()
 
 //------------------------------------------------------------
 //------------------------------------------------------------
-void AQLWeaponNailGun::PrepareForImpendingWeaponSwitch()
+void AQLWeaponNailGun::StopFire()
 {
     // stop firing
     if (bIsFireHeld)
@@ -151,12 +158,14 @@ void AQLWeaponNailGun::SpawnNailProjectile()
         // pass controller to Nail as damage instigator
         AController* Controller = User->GetController();
         AQLPlayerController* QLPlayerController = Cast<AQLPlayerController>(Controller);
-        Nail->SetQLPlayerController(QLPlayerController);
+        Nail->QLSetPlayerController(QLPlayerController);
         Nail->SetDamageMultiplier(DamageMultiplier);
         UGameplayStatics::FinishSpawningActor(Nail, MyTransform);
 
         // change velocity
-        FVector FinalVelocity = ProjectileForwardVector * Nail->GetProjectileMovementComponent()->InitialSpeed;
+        Nail->GetProjectileMovementComponent()->MaxSpeed = ProjectileSpeed;
+        Nail->GetProjectileMovementComponent()->InitialSpeed = ProjectileSpeed;
+        FVector FinalVelocity = ProjectileForwardVector * ProjectileSpeed;
         Nail->GetProjectileMovementComponent()->Velocity = FinalVelocity;
     }
 }

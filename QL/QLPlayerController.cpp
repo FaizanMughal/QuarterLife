@@ -27,6 +27,8 @@ FPS(0.0f)
 
     UmgInventoryClass = UQLUmgInventory::StaticClass();
     UmgInventory = nullptr;
+
+    QLTeamId = FGenericTeamId(0);
 }
 
 //------------------------------------------------------------
@@ -70,13 +72,13 @@ void AQLPlayerController::Tick(float DeltaSeconds)
 void AQLPlayerController::AddUMG()
 {
     UmgFirstPerson = CreateWidget<UQLUmgFirstPerson>(GetWorld(), UmgFirstPersonClass, FName(TEXT("UmgFirstPerson")));
-    UmgFirstPerson->SetQLPlayerController(this);
+    UmgFirstPerson->QLSetPlayerController(this);
     UmgFirstPerson->AddToViewport();
     bShowMouseCursor = false;
     SetInputMode(FInputModeGameOnly());
 
     UmgInventory = CreateWidget<UQLUmgInventory>(GetWorld(), UmgInventoryClass, FName(TEXT("UmgInventory")));
-    UmgInventory->SetQLPlayerController(this);
+    UmgInventory->QLSetPlayerController(this);
 }
 
 //------------------------------------------------------------
@@ -91,6 +93,8 @@ UQLUmgFirstPerson* AQLPlayerController::GetUMG()
 void AQLPlayerController::PostInitializeComponents()
 {
     Super::PostInitializeComponents();
+
+    SetGenericTeamId(QLTeamId);
 }
 
 //------------------------------------------------------------
@@ -161,4 +165,19 @@ void AQLPlayerController::SetupInputComponent()
     Super::SetupInputComponent();
 
     InputComponent->BindAction("AbilityMenu", EInputEvent::IE_Pressed, this, &AQLPlayerController::ShowAbilityMenu);
+    InputComponent->BindAction("RestartLevel", EInputEvent::IE_Pressed, this, &AQLPlayerController::OnRestartLevel);
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLPlayerController::OnRestartLevel()
+{
+    UGameplayStatics::OpenLevel(GetWorld(), "QLArena");
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+FGenericTeamId AQLPlayerController::GetGenericTeamId() const
+{
+    return QLTeamId;
 }

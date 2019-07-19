@@ -7,24 +7,23 @@
 // (='.'=)
 // (")-(")o
 //------------------------------------------------------------
-
 #pragma once
 
 #include "CoreMinimal.h"
-#include "GameFramework/GameModeBase.h"
-#include "QLGameModeBase.generated.h"
+#include "Perception/AIPerceptionComponent.h"
+#include "QLAIPerceptionComponent.generated.h"
 
-class QLCharacterHelper;
+class AQLAIController;
 
 //------------------------------------------------------------
 //------------------------------------------------------------
 UCLASS()
-class QL_API AQLGameModeBase : public AGameModeBase
+class QL_API UQLAIPerceptionComponent : public UAIPerceptionComponent
 {
 	GENERATED_BODY()
 
 public:
-    AQLGameModeBase();
+    UQLAIPerceptionComponent(const FObjectInitializer & ObjectInitializer);
 
-protected:
+    virtual void HandleExpiredStimulus(FAIStimulus& StimulusStore) override;
 };

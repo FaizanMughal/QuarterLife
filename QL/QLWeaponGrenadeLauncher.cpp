@@ -29,6 +29,8 @@ AQLWeaponGrenadeLauncher::AQLWeaponGrenadeLauncher()
     RateOfFire = 1.0f;
 
     RecyclerGrenadeProjectileClass = AQLRecyclerGrenadeProjectile::StaticClass();
+    bIsProjectileWeapon = true;
+    ProjectileSpeed = 2000.0f;
 }
 
 //------------------------------------------------------------
@@ -121,12 +123,14 @@ void AQLWeaponGrenadeLauncher::OnFire()
         // pass controller to RecyclerGrenade as damage instigator
         AController* Controller = User->GetController();
         AQLPlayerController* QLPlayerController = Cast<AQLPlayerController>(Controller);
-        RecyclerGrenade->SetQLPlayerController(QLPlayerController);
+        RecyclerGrenade->QLSetPlayerController(QLPlayerController);
         RecyclerGrenade->SetDamageMultiplier(DamageMultiplier);
         UGameplayStatics::FinishSpawningActor(RecyclerGrenade, MyTransform);
 
         // change velocity
-        FVector FinalVelocity = ProjectileForwardVector * RecyclerGrenade->GetProjectileMovementComponent()->InitialSpeed;
+        RecyclerGrenade->GetProjectileMovementComponent()->MaxSpeed = ProjectileSpeed;
+        RecyclerGrenade->GetProjectileMovementComponent()->InitialSpeed = ProjectileSpeed;
+        FVector FinalVelocity = ProjectileForwardVector * ProjectileSpeed;
         RecyclerGrenade->GetProjectileMovementComponent()->Velocity = FinalVelocity;
     }
 }
