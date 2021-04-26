@@ -15,7 +15,6 @@
 #include "QLColoredPortal.h"
 #include "Engine/World.h"
 #include "Components/BoxComponent.h"
-#include "QLPortalCompatibleActor.h"
 #include "Kismet/GameplayStatics.h"
 #include "QLWeaponManager.h"
 
@@ -27,6 +26,7 @@ AQLWeaponPortalGun::AQLWeaponPortalGun()
     HitRange = 10000.0f;
 
     QLName = FName(TEXT("PortalGun"));
+    WeaponType = EQLWeapon::PortalGun;
 
     PortalClass = AQLColoredPortal::StaticClass();
 }
@@ -84,16 +84,17 @@ void AQLWeaponPortalGun::CreatePortalIfConditionsAreMet(EPortalColor PortalColor
     {
         // do sth
         QLUtility::Log("AQLWeaponPortalGun: no hit");
-        PlaySound(FName(TEXT("NoPortal")));
         return;
     }
 
     // if hit occurs
+    AActor* pgcActor = HitResult.GetActor();
+
     // check if the hit actor is compatible with the portal gun
-    auto* pgcActor = Cast<AQLPortalCompatibleActor>(HitResult.GetActor());
+    bool bPortalCompatible = CheckIfActorIsPortalCompatible(pgcActor);
 
     // if the hit actor is not compatible
-    if (!pgcActor)
+    if (!bPortalCompatible)
     {
         // do sth
         QLUtility::Log("AQLWeaponPortalGun: not compatible");
@@ -185,3 +186,29 @@ void AQLWeaponPortalGun::CreatePortalIfConditionsAreMet(EPortalColor PortalColor
     PlayAnimationMontage(FName(TEXT("Fire")));
 }
 
+//------------------------------------------------------------
+//------------------------------------------------------------
+bool AQLWeaponPortalGun::CheckIfActorIsPortalCompatible(AActor* TargetActor)
+{
+    // There are several ways to implement this:
+
+    // method 1: use inheritance (most intrusive and inconvenient)
+
+    // method 2: use UE reflection system (convenient but expensive)
+    // bool found = false;
+    // for (TFieldIterator<FProperty> PropIt(TargetActor->GetClass()); PropIt; ++PropIt)
+    // {
+    //     FProperty* Property = *PropIt;
+    //     if (Property->GetName() == "QLPortalCompatible")
+    //     {
+    //         found = true;
+    //         break;
+    //     }
+    // }
+    // return found;
+
+    // method 3: use tag (convenient and inexpensive)
+    bool found = TargetActor->ActorHasTag(FName(TEXT("QLPortalCompatible")));
+    QLUtility::Log(found);
+    return found;
+}

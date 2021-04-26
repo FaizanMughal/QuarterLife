@@ -32,19 +32,22 @@
 #include "QLUmgInventory.h"
 #include "Components/AudioComponent.h"
 #include "QLAIController.h"
-#include "Classes/Perception/AIPerceptionStimuliSourceComponent.h"
-#include "Classes/Perception/AISense.h"
-#include "Classes/Perception/AISense_Sight.h"
-#include "Classes/Perception/AISense_Hearing.h"
-#include "Classes/Perception/AISense_Prediction.h"
-#include "Classes/Perception/AISense_Damage.h"
-#include "Classes/Perception/AISense_Team.h"
+#include "Perception/AIPerceptionStimuliSourceComponent.h"
+#include "Perception/AISense.h"
+#include "Perception/AISense_Sight.h"
+#include "Perception/AISense_Hearing.h"
+#include "Perception/AISense_Prediction.h"
+#include "Perception/AISense_Damage.h"
+#include "Perception/AISense_Team.h"
 #include "NavigationSystem.h"
+#include "QLMoveComponentQuake.h"
+#include "QLMovementParameterQuake.h"
 
 //------------------------------------------------------------
 // Sets default values
 //------------------------------------------------------------
-AQLCharacter::AQLCharacter()
+AQLCharacter::AQLCharacter(const class FObjectInitializer& ObjectInitializer) :
+Super(ObjectInitializer.SetDefaultSubobjectClass<UQLMoveComponentQuake>(ACharacter::CharacterMovementComponentName))
 {
     Health = 150.0f;
     MaxHealth = 200.0f;
@@ -60,14 +63,14 @@ AQLCharacter::AQLCharacter()
     GetCapsuleComponent()->InitCapsuleSize(30.0f, 85.0f);
 
     // set our turn rates for input
-    BaseTurnRate = 45.0f;
-    BaseLookUpRate = 45.0f;
+    BaseTurnRate = 40.0f;
+    BaseLookUpRate = 40.0f;
 
     // Create a CameraComponent
     FirstPersonCameraComponent = CreateDefaultSubobject<UCameraComponent>(TEXT("FirstPersonCameraComponent"));
     FirstPersonCameraComponent->SetupAttachment(GetCapsuleComponent());
     //FirstPersonCameraComponent->RelativeLocation = FVector(-39.56f, 1.75f, 64.f); // Position the camera
-    FirstPersonCameraComponent->RelativeLocation = FVector(-10.0f, 1.75f, 64.0f);
+    FirstPersonCameraComponent->SetRelativeLocation(FVector(-10.0f, 1.75f, 64.0f));
     FirstPersonCameraComponent->bUsePawnControlRotation = true; // critical! If false, mouse would not change pitch!
     FirstPersonCameraComponent->SetFieldOfView(100.0f);
 
@@ -77,8 +80,8 @@ AQLCharacter::AQLCharacter()
     FirstPersonMesh->SetupAttachment(FirstPersonCameraComponent);
     FirstPersonMesh->SetCollisionProfileName(TEXT("NoCollision"));
     FirstPersonMesh->CastShadow = false;
-    FirstPersonMesh->RelativeRotation = FRotator(1.9f, -19.19f, 5.2f);
-    FirstPersonMesh->RelativeLocation = FVector(-0.5f, -4.4f, -155.7f);
+    FirstPersonMesh->SetRelativeRotation(FRotator(1.9f, -19.19f, 5.2f));
+    FirstPersonMesh->SetRelativeLocation(FVector(-0.5f, -4.4f, -155.7f));
 
     // third person
     ThirdPersonMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("ThirdPersonMesh"));
@@ -110,6 +113,8 @@ AQLCharacter::AQLCharacter()
     bQLIsVulnerable = true;
 
     bJumpButtonDown = false;
+    moveForwardInputValue = 0.0f;
+    moveRightInputValue = 0.0f;
 
     bQLIsBot = false;
 
@@ -122,8 +127,7 @@ AQLCharacter::AQLCharacter()
     DurationAfterDeathBeforeDestroyed = 3.0f;
     DurationAfterDeathBeforeRespawn = 2.5f;
 
-    // movement
-    GetCharacterMovement()->AirControl = 0.5;
+    MovementParameterQuakeClass = UQLMovementParameterQuake::StaticClass();
 }
 
 //------------------------------------------------------------
@@ -172,6 +176,27 @@ void AQLCharacter::PostInitializeComponents()
 
     QLSetVisibility(bQLIsVisible);
     QLSetVulnerability(bQLIsVulnerable);
+
+    // movement data
+    // If the movement data is instantiated using
+    // NewObject<UQLMovementParameterQuake>(this, MovementParameterQuakeClass->GetFName()),
+    // at runtime the default movement data will always be used.
+    // To let the movement data be conveniently editable via blueprint subclass,
+    // the function call must follow this form:
+    MovementParameterQuake = NewObject<UQLMovementParameterQuake>(this,
+        MovementParameterQuakeClass->GetFName(),
+        EObjectFlags::RF_NoFlags,
+        MovementParameterQuakeClass.GetDefaultObject());
+
+    if (MovementParameterQuake)
+    {
+        UPawnMovementComponent* MyMovementComp = GetMovementComponent();
+        UQLMoveComponentQuake* MyMovementCompQuake = Cast<UQLMoveComponentQuake>(MyMovementComp);
+        if (MyMovementCompQuake)
+        {
+            MyMovementCompQuake->SetMovementParameter(MovementParameterQuake);
+        }
+    }
 }
 
 //------------------------------------------------------------
@@ -199,6 +224,7 @@ void AQLCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
     PlayerInputComponent->BindAction("AltFire", EInputEvent::IE_Pressed, this, &AQLCharacter::OnAltFire);
     PlayerInputComponent->BindAction("AltFire", EInputEvent::IE_Released, this, &AQLCharacter::OnAltFireRelease);
 
+    PlayerInputComponent->BindAction("SwitchToGauntlet", EInputEvent::IE_Pressed, this, &AQLCharacter::SwitchToGauntlet);
     PlayerInputComponent->BindAction("SwitchToRocketLauncher", EInputEvent::IE_Pressed, this, &AQLCharacter::SwitchToRocketLauncher);
     PlayerInputComponent->BindAction("SwitchToLightningGun", EInputEvent::IE_Pressed, this, &AQLCharacter::SwitchToLightningGun);
     PlayerInputComponent->BindAction("SwitchToRailGun", EInputEvent::IE_Pressed, this, &AQLCharacter::SwitchToRailGun);
@@ -214,8 +240,11 @@ void AQLCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 
     // We have 2 versions of the rotation bindings to handle different kinds of devices differently
     // "turn" handles devices that provide an absolute delta, such as a mouse.
-    PlayerInputComponent->BindAxis("Turn", this, &APawn::AddControllerYawInput);
-    PlayerInputComponent->BindAxis("LookUp", this, &APawn::AddControllerPitchInput);
+    PlayerInputComponent->BindAxis("Turn", this, &AQLCharacter::AddControllerYawInput);
+    PlayerInputComponent->BindAxis("LookUp", this, &AQLCharacter::AddControllerPitchInput);
+
+    PlayerInputComponent->BindAction("Debug", EInputEvent::IE_Pressed, this, &AQLCharacter::OnDebug);
+
 }
 
 //------------------------------------------------------------
@@ -252,6 +281,8 @@ void AQLCharacter::MoveForward(float Value)
         // add movement in that direction
         AddMovementInput(GetActorForwardVector(), Value);
     }
+
+    moveForwardInputValue = Value;
 }
 
 //------------------------------------------------------------
@@ -263,6 +294,22 @@ void AQLCharacter::MoveRight(float Value)
         // add movement in that direction
         AddMovementInput(GetActorRightVector(), Value);
     }
+
+    moveRightInputValue = Value;
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+float AQLCharacter::GetMoveForwardInputValue()
+{
+    return moveForwardInputValue;
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+float AQLCharacter::GetMoveRightInputValue()
+{
+    return moveRightInputValue;
 }
 
 //------------------------------------------------------------
@@ -487,14 +534,28 @@ void AQLCharacter::RemovePowerup(AQLPowerup* Powerup)
 
 //------------------------------------------------------------
 //------------------------------------------------------------
-void AQLCharacter::SetCurrentWeapon(const FName& QLName)
+void AQLCharacter::SetCurrentWeapon(const EQLWeapon WeaponType)
 {
     if (!WeaponManager)
     {
         return;
     }
 
-    WeaponManager->SetCurrentWeapon(QLName);
+    WeaponManager->SetCurrentWeapon(WeaponType);
+
+    // for melee weapon, hide first person mesh for the time being
+    if (GetCurrentWeapon() != nullptr)
+    {
+        if (GetCurrentWeapon()->GetQLName() == FName(TEXT("Gauntlet")))
+        {
+            FirstPersonMesh->SetVisibility(false);
+        }
+        else
+        {
+            FirstPersonMesh->SetVisibility(true);
+        }
+    }
+
 }
 
 //------------------------------------------------------------
@@ -511,14 +572,14 @@ AQLWeapon* AQLCharacter::GetCurrentWeapon()
 
 //------------------------------------------------------------
 //------------------------------------------------------------
-void AQLCharacter::SetCurrentAbility(const FName& QLName)
+void AQLCharacter::SetCurrentAbility(const EQLAbility AbilityType)
 {
     if (!AbilityManager)
     {
         return;
     }
 
-    AbilityManager->SetCurrentAbility(QLName);
+    AbilityManager->SetCurrentAbility(AbilityType);
 }
 
 //------------------------------------------------------------
@@ -758,11 +819,21 @@ AQLPlayerController* AQLCharacter::GetQLPlayerController()
 
 //------------------------------------------------------------
 //------------------------------------------------------------
+void AQLCharacter::SwitchToGauntlet()
+{
+    if (bCanSwitchWeapon)
+    {
+        SetCurrentWeapon(EQLWeapon::Gauntlet);
+    }
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
 void AQLCharacter::SwitchToRocketLauncher()
 {
     if (bCanSwitchWeapon)
     {
-        SetCurrentWeapon(FName(TEXT("RocketLauncher")));
+        SetCurrentWeapon(EQLWeapon::RocketLauncher);
     }
 }
 
@@ -772,7 +843,7 @@ void AQLCharacter::SwitchToLightningGun()
 {
     if (bCanSwitchWeapon)
     {
-        SetCurrentWeapon(FName(TEXT("LightningGun")));
+        SetCurrentWeapon(EQLWeapon::LightningGun);
     }
 }
 
@@ -782,7 +853,7 @@ void AQLCharacter::SwitchToRailGun()
 {
     if (bCanSwitchWeapon)
     {
-        SetCurrentWeapon(FName(TEXT("RailGun")));
+        SetCurrentWeapon(EQLWeapon::RailGun);
     }
 }
 
@@ -792,7 +863,7 @@ void AQLCharacter::SwitchToNailGun()
 {
     if (bCanSwitchWeapon)
     {
-        SetCurrentWeapon(FName(TEXT("NailGun")));
+        SetCurrentWeapon(EQLWeapon::NailGun);
     }
 }
 
@@ -802,7 +873,7 @@ void AQLCharacter::SwitchToPortalGun()
 {
     if (bCanSwitchWeapon)
     {
-        SetCurrentWeapon(FName(TEXT("PortalGun")));
+        SetCurrentWeapon(EQLWeapon::PortalGun);
     }
 }
 
@@ -812,7 +883,7 @@ void AQLCharacter::SwitchToGrenadeLauncher()
 {
     if (bCanSwitchWeapon)
     {
-        SetCurrentWeapon(FName(TEXT("GrenadeLauncher")));
+        SetCurrentWeapon(EQLWeapon::GrenadeLauncher);
     }
 }
 
@@ -823,6 +894,11 @@ void AQLCharacter::Die()
     if (WeaponManager)
     {
         WeaponManager->DestroyAllWeapon();
+    }
+
+    if (AbilityManager)
+    {
+        AbilityManager->DestroyAllAbility();
     }
 
     UAnimSequence* Animation = PlayAnimationSequence("Death1");
@@ -868,7 +944,8 @@ void AQLCharacter::OnDie()
 //------------------------------------------------------------
 void AQLCharacter::OnRespawnNewCharacter()
 {
-    RespawnCharacterRandomly();
+    // to do: a separate class to manage respawn explicitly
+    // RespawnCharacterRandomly();
 }
 
 //------------------------------------------------------------
@@ -1077,14 +1154,14 @@ void AQLCharacter::SetWeaponEnabled(const bool bFlag)
 
 //------------------------------------------------------------
 //------------------------------------------------------------
-bool AQLCharacter::HasWeapon(const FName& WeaponName)
+bool AQLCharacter::HasWeapon(const EQLWeapon WeaponType)
 {
     if (!WeaponManager)
     {
         return false;
     }
 
-    return WeaponManager->HasWeapon(WeaponName);
+    return WeaponManager->HasWeapon(WeaponType);
 }
 
 //------------------------------------------------------------
@@ -1175,9 +1252,19 @@ void AQLCharacter::EquipAll()
         WeaponManager->CreateAndAddAllWeapons(WeaponClassList);
     }
 
-    if (AbilityManager)
+    if (!bQLIsBot && AbilityManager)
     {
         AbilityManager->CreateAndAddAllAbilities(AbilityClassList);
+    }
+
+    if (bQLIsBot)
+    {
+        SetCurrentMovementStyle(EQLMovementStyle::Default);
+    }
+    else
+    {
+        SetCurrentMovementStyle(EQLMovementStyle::QuakeVanilla);
+        //SetCurrentMovementStyle(EQLMovementStyle::QuakeCPMA);
     }
 }
 
@@ -1227,4 +1314,43 @@ void AQLCharacter::RespawnCharacterRandomly()
 void AQLCharacter::FellOutOfWorld(const UDamageType& dmgType)
 {
     Die();
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+UQLAbilityManager* AQLCharacter::GetAbilityManager()
+{
+    return AbilityManager;
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLCharacter::OnDebug()
+{
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLCharacter::AddControllerYawInput(float Val)
+{
+    Super::AddControllerYawInput(0.6f * Val);
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLCharacter::AddControllerPitchInput(float Val)
+{
+    Super::AddControllerPitchInput(0.6f * Val);
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLCharacter::SetCurrentMovementStyle(EQLMovementStyle MyStyle)
+{
+    UCharacterMovementComponent* CharacterMovementComponent = GetCharacterMovement();
+    UQLMoveComponentQuake* MoveComponentQuake = Cast<UQLMoveComponentQuake>(CharacterMovementComponent);
+    if (MoveComponentQuake)
+    {
+        MoveComponentQuake->SetMovementStyle(MyStyle);
+    }
 }

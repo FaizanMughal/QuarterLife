@@ -14,7 +14,7 @@
 #include "GameFramework/Actor.h"
 #include "QLPickup.generated.h"
 
-class UBoxComponent;
+class USphereComponent;
 class UStaticMeshComponent;
 
 //------------------------------------------------------------
@@ -34,16 +34,21 @@ public:
     virtual void Tick(float DeltaTime) override;
 
     UFUNCTION(BlueprintCallable, Category = "C++Function")
-    void PlaySoundFireAndForget(const FName& SoundName);
+    void PlaySoundFireAndForget(const FName& SoundName, EVirtualizationMode VirtualizationMode = EVirtualizationMode::PlayWhenSilent);
+
+    USoundBase* GetSoundBase(const FName& SoundName);
 
     UFUNCTION(BlueprintCallable, Category = "C++Function")
-    void PlaySound(const FName& SoundName);
+    void PlaySound(const FName& SoundName, EVirtualizationMode VirtualizationMode = EVirtualizationMode::PlayWhenSilent);
 
     UFUNCTION(BlueprintCallable, Category = "C++Function")
     void StopSound();
 
     UFUNCTION(BlueprintCallable, Category = "C++Function")
-    virtual void PlayAnimationMontage(const FName& AnimationMontageName);
+    virtual void PlayAnimationMontage(const FName& MontageName);
+
+    UFUNCTION(BlueprintCallable, Category = "C++Function")
+    virtual void PlayAnimationMontageJumpToSection(const FName& MontageName, const FName& SectionName);
 
     UFUNCTION(BlueprintCallable, Category = "C++Function")
     void SetConstantRotationEnabled(const bool bFlag);
@@ -77,6 +82,8 @@ public:
     //------------------------------------------------------------
     UFUNCTION(BlueprintCallable, Category = "C++Function")
     void PerformRotationInterpWithDelay(const float Delay);
+
+    virtual void Debug();
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;

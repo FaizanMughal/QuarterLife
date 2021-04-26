@@ -26,10 +26,12 @@
 AQLWeaponRocketLauncher::AQLWeaponRocketLauncher()
 {
     QLName = FName(TEXT("RocketLauncher"));
+    WeaponType = EQLWeapon::RocketLauncher;
+
     RateOfFire = 0.8f;
     RocketProjectileClass = AQLRocketProjectile::StaticClass();
     bIsProjectileWeapon = true;
-    ProjectileSpeed = 2000.0f;
+    ProjectileSpeed = 2500.0f; // 1000 ups = 2500 cm/s
 }
 
 //------------------------------------------------------------
@@ -68,6 +70,25 @@ void AQLWeaponRocketLauncher::OnFire()
                                     false, // loop
                                     RateOfFire); // delay in second
 
+    // allow continuous shooting
+    if (bIsFireHeld)
+    {
+        return;
+    }
+
+    bIsFireHeld = true;
+    GetWorldTimerManager().SetTimer(HoldFireTimerHandle,
+        this,
+        &AQLWeaponRocketLauncher::SpawnProjectile,
+        RateOfFire, // time interval in second
+        true, // loop
+        0.0f); // delay in second
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLWeaponRocketLauncher::SpawnProjectile()
+{
     PlayAnimationMontage(FName(TEXT("Fire")));
 
     PlaySoundFireAndForget(FName(TEXT("Fire")));
@@ -89,7 +110,7 @@ void AQLWeaponRocketLauncher::OnFire()
         return;
     }
 
-    FVector SourceLocation = GetMuzzleLocation() + CameraComponent->GetForwardVector() * 10.0f;
+    FVector SourceLocation = CameraComponent->GetComponentLocation() + CameraComponent->GetForwardVector() * 200.0f;
     FVector TargetLocation;
 
     // if hit occurs
@@ -99,7 +120,7 @@ void AQLWeaponRocketLauncher::OnFire()
     }
     else
     {
-        TargetLocation = GetMuzzleLocation() + CameraComponent->GetForwardVector() * HitRange;
+        TargetLocation = SourceLocation + CameraComponent->GetForwardVector() * HitRange;
     }
 
     FVector ProjectileForwardVector = TargetLocation - SourceLocation;
@@ -134,4 +155,18 @@ void AQLWeaponRocketLauncher::OnFire()
         FVector FinalVelocity = ProjectileForwardVector * ProjectileSpeed;
         Rocket->GetProjectileMovementComponent()->Velocity = FinalVelocity;
     }
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLWeaponRocketLauncher::OnFireRelease()
+{
+    if (!bIsFireHeld)
+    {
+        return;
+    }
+
+    bIsFireHeld = false;
+
+    GetWorldTimerManager().ClearTimer(HoldFireTimerHandle);
 }

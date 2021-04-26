@@ -53,6 +53,8 @@ AQLWeapon::AQLWeapon()
     DamageMultiplier = 1.0;
 
     bIsProjectileWeapon = false;
+
+    WeaponType = EQLWeapon::None;
 }
 
 //------------------------------------------------------------
@@ -67,6 +69,8 @@ void AQLWeapon::PostInitializeComponents()
         DynamicMaterialGun = GunSkeletalMeshComponent->CreateAndSetMaterialInstanceDynamicFromMaterial(0, BasicMaterial);
         GunSkeletalMeshComponent->SetMaterial(0, DynamicMaterialGun.Get());
     }
+
+    AnimInstanceWeapon = GunSkeletalMeshComponent->GetAnimInstance();
 }
 
 //------------------------------------------------------------
@@ -135,6 +139,13 @@ void AQLWeapon::OnAltFireHold()
 
 //------------------------------------------------------------
 //------------------------------------------------------------
+void AQLWeapon::SpawnProjectile()
+{
+
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
 USkeletalMeshComponent* AQLWeapon::GetGunSkeletalMeshComponent()
 {
     return GunSkeletalMeshComponent;
@@ -195,6 +206,11 @@ UQLWeaponManager* AQLWeapon::GetWeaponManager()
 //------------------------------------------------------------
 void AQLWeapon::StopFire()
 {
+    // stop firing
+    if (bIsFireHeld)
+    {
+        OnFireRelease();
+    }
 }
 
 //------------------------------------------------------------
@@ -205,13 +221,13 @@ void AQLWeapon::OnComponentBeginOverlapImpl(UPrimitiveComponent* OverlappedComp,
     if (QLCharacter)
     {
         // if the character has weapon of this type already, nothing will happen
-        if (QLCharacter->HasWeapon(this->GetQLName()))
+        if (QLCharacter->HasWeapon(this->GetWeaponType()))
         {
             return;
         }
 
         QLCharacter->AddWeapon(this);
-        QLCharacter->SetCurrentWeapon(this->GetQLName());
+        QLCharacter->SetCurrentWeapon(this->GetWeaponType());
         PlaySound("PickUp");
 
         // disable delegate
@@ -233,9 +249,62 @@ void AQLWeapon::EnableFireCallBack()
 
 //------------------------------------------------------------
 //------------------------------------------------------------
-void AQLWeapon::PlayAnimationMontage(const FName& AnimationMontageName)
+UAnimMontage* AQLWeapon::GetAnimationMontage(const FName& MontageName)
 {
-    UAnimMontage** Result = AnimationMontageList.Find(AnimationMontageName);
+    UAnimMontage* MyMontage = nullptr;
+
+    UAnimMontage** Result = AnimationMontageList.Find(MontageName);
+    if (Result)
+    {
+        MyMontage = *Result;
+    }
+
+    return MyMontage;
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLWeapon::PlayAnimationMontage(const FName& MontageName)
+{
+    UAnimMontage** Result = AnimationMontageList.Find(MontageName);
+    if (Result)
+    {
+        UAnimMontage* MyAnimationMontage = *Result;
+        if (MyAnimationMontage)
+        {
+            UAnimInstance* AnimInstance = GunSkeletalMeshComponent->GetAnimInstance();
+            if (AnimInstance)
+            {
+                AnimInstance->Montage_Play(MyAnimationMontage, 1.0f);
+            }
+        }
+    }
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLWeapon::PlayAnimationMontageJumpToSection(const FName& MontageName, const FName& SectionName)
+{
+    UAnimMontage** Result = AnimationMontageList.Find(MontageName);
+    if (Result)
+    {
+        UAnimMontage* MyAnimationMontage = *Result;
+        if (MyAnimationMontage)
+        {
+            UAnimInstance* AnimInstance = GunSkeletalMeshComponent->GetAnimInstance();
+            if (AnimInstance)
+            {
+                AnimInstance->Montage_JumpToSection(SectionName, MyAnimationMontage);
+            }
+        }
+    }
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLWeapon::PlayAnimationMontageForCharacter(const FName& MontageName)
+{
+    UAnimMontage** Result = AnimationMontageList.Find(MontageName);
     if (Result)
     {
         UAnimMontage* Animation = *Result;
@@ -305,4 +374,11 @@ bool AQLWeapon::IsProjectileWeapon()
 float AQLWeapon::GetProjectileSpeed()
 {
     return ProjectileSpeed;
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+EQLWeapon AQLWeapon::GetWeaponType() const
+{
+    return WeaponType;
 }

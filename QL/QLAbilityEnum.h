@@ -11,14 +11,17 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "QLPortalEnum.generated.h"
+#include "QLAbilityEnum.generated.h"
 
 //------------------------------------------------------------
 //------------------------------------------------------------
 UENUM(BlueprintType)
-enum class EPortalColor : uint8
+enum class EQLAbility : uint8
 {
-    Invalid UMETA(DisplayName="Invalid"),
-    Blue UMETA(DisplayName = "Blue"),
-    Orange UMETA(DisplayName = "Orange"),
+    None UMETA(DisplayName = "None"),
+    GhostWalk UMETA(DisplayName = "GhostWalk"),
+    HealingRain UMETA(DisplayName = "HealingRain"),
+    PiercingSight UMETA(DisplayName = "PiercingSight"),
+    TheWorld UMETA(DisplayName = "TheWorld"),
+    TimeTravel UMETA(DisplayName = "TimeTravel"),
 };

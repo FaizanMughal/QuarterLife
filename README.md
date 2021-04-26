@@ -1,14 +1,16 @@
 # Quarter Life
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3988513.svg)](https://doi.org/10.5281/zenodo.3988513)
+
 Tianyu Liu
 kingcrimsontianyu@gmail.com
-2015-2019
+2015-2021
 
 ------
 
 ## Introduction
 
-Quarter Life (QL), based on Unreal Engine, is a first-person adventure game and my personal side project. My inspiration comes from Half Life, Portal, Bioshock, Dishonored, Prey, Witcher, Shadow Warrior, Unreal Tournament, Doom, Quake, Control.
+Quarter Life (QL), based on Unreal Engine, is a first-person adventure game and my personal side project. It is intended to combine fun gameplay elements with advanced movement mechanics. **Advanced movement** specifically refers to Quake-style movement where players apply strafe jumping, bunny hopping and other advanced movement techniques to gain exceptionally high speed, which provides a unique feeling of conquering and transcending space. Apart from Quake, my inspiration comes from Half Life, Portal, Bioshock, Dishonored, Prey, Witcher, Shadow Warrior, Unreal Tournament, Doom, Control.
 
 This game is developed in primarily C++ and a bit of Unreal Blueprint visual scripts. Blueprint classes related to game mechanics are almost all subclassed from C++.
 
@@ -18,11 +20,14 @@ Regarding this repository:
 - Some asset data, for example sound cues, are extracted and modified from other video games or Unreal Engine samples. To strictly comply with EULA, these derivative asset data are never included in this repository.
 - Blueprints are not included in this repository, but available on request (kingcrimsontianyu@gmail.com), with all derivative asset data removed.
 
-This game is developed and tested on Unreal Engine version: **4.22.3**.
+This game is developed and tested on Unreal Engine version: **4.26.0**.
 
 ------
 
 ## Work-in-progress features
++ Movement
+    + Strafe jumping (Vanilla Quake 3, Quake Champions)
+
 + Weapon
     + Unholy trinity (Quake Champions)
         + Lightning gun
@@ -48,9 +53,14 @@ This game is developed and tested on Unreal Engine version: **4.22.3**.
     + Floating health bar and armor bar
     + Floating damage numbers
 
++ Bot
+
 ------
 
 ## Planned features
++ Movement
+    + Bunny hopping (Quake 3 CPMA, Quake Champions)
+    + Crouch sliding (Quake Champions)
 
 + Weapon
     + Big Fucking Gun (BFG) (Doom)
@@ -63,19 +73,27 @@ This game is developed and tested on Unreal Engine version: **4.22.3**.
     + Dual wield 雙剎 (Quake Champions)
     + Barrier shield 天盾 (Quake Champions)
 
-+ Movement
-    + Strafe jump (Quake Champions)
-
 + Puzzle
-	+ Magical traffic light (Control)
+    + Magical traffic light (Control)
 
 + Quest system
-
-+ Bot
 
 ------
 
 ## Clip
+
+### Strafe Jump
+<a href="https://youtu.be/jhcCQMhP6bs" target="_blank"><img src="http://i3.ytimg.com/vi/jhcCQMhP6bs/hqdefault.jpg" width="480" height="360" border="10" /></a>
+
+<a href="https://youtu.be/3dOVJwDpYko" target="_blank"><img src="http://i3.ytimg.com/vi/3dOVJwDpYko/hqdefault.jpg" width="480" height="360" border="10" /></a>
+
+### Time travel ability
+<a href="https://youtu.be/6tU8AoKCccc" target="_blank"><img src="http://i3.ytimg.com/vi/6tU8AoKCccc/hqdefault.jpg" width="480" height="360" border="10" /></a>
+
+<a href="https://youtu.be/Vuq2_Q2AwQw" target="_blank"><img src="http://i3.ytimg.com/vi/Vuq2_Q2AwQw/hqdefault.jpg" width="480" height="360" border="10" /></a>
+
+### Bots
+<a href="https://youtu.be/3cK2KJ3Y5zE" target="_blank"><img src="http://i3.ytimg.com/vi/3cK2KJ3Y5zE/hqdefault.jpg" width="480" height="360" border="10" /></a>
 
 ### Nailgun, The World ability, Recycler Grenade Launcher
 <a href="https://youtu.be/TGVjuJ0y8JE" target="_blank"><img src="http://i3.ytimg.com/vi/TGVjuJ0y8JE/hqdefault.jpg" width="480" height="360" border="10" /></a>

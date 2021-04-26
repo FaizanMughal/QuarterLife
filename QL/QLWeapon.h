@@ -12,6 +12,7 @@
 
 #include "CoreMinimal.h"
 #include "QLPickup.h"
+#include "QLWeaponEnum.h"
 #include "QLWeapon.generated.h"
 
 class AQLCharacter;
@@ -50,7 +51,15 @@ public:
     UFUNCTION(BlueprintCallable, Category = "C++Function")
     virtual void OnAltFireHold();
 
-    virtual void PlayAnimationMontage(const FName& AnimationName) override;
+    virtual void SpawnProjectile();
+
+    UAnimMontage* GetAnimationMontage(const FName& MontageName);
+
+    virtual void PlayAnimationMontage(const FName& MontageName) override;
+
+    virtual void PlayAnimationMontageJumpToSection(const FName& MontageName, const FName& SectionName);
+
+    virtual void PlayAnimationMontageForCharacter(const FName& MontageName);
 
     UFUNCTION(BlueprintCallable, Category = "C++Function")
     USkeletalMeshComponent* GetGunSkeletalMeshComponent();
@@ -90,6 +99,9 @@ public:
 
     UFUNCTION(BlueprintCallable, Category = "C++Function")
     float GetProjectileSpeed();
+
+    UFUNCTION(BlueprintCallable, Category = "C++Function")
+    EQLWeapon GetWeaponType() const;
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
@@ -153,4 +165,10 @@ protected:
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "C++Property")
     float ProjectileSpeed;
+
+    UPROPERTY()
+    TWeakObjectPtr<UAnimInstance> AnimInstanceWeapon;
+
+    UPROPERTY()
+    EQLWeapon WeaponType;
 };

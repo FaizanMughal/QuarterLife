@@ -25,6 +25,7 @@
 AQLWeaponGrenadeLauncher::AQLWeaponGrenadeLauncher()
 {
     QLName = FName(TEXT("GrenadeLauncher"));
+    WeaponType = EQLWeapon::GrenadeLauncher;
 
     RateOfFire = 1.0f;
 
@@ -67,6 +68,25 @@ void AQLWeaponGrenadeLauncher::OnFire()
         false, // loop
         RateOfFire); // delay in second
 
+    // allow continuous shooting
+    if (bIsFireHeld)
+    {
+        return;
+    }
+
+    bIsFireHeld = true;
+    GetWorldTimerManager().SetTimer(HoldFireTimerHandle,
+        this,
+        &AQLWeaponGrenadeLauncher::SpawnProjectile,
+        RateOfFire, // time interval in second
+        true, // loop
+        0.0f); // delay in second
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLWeaponGrenadeLauncher::SpawnProjectile()
+{
     PlayAnimationMontage(FName(TEXT("Fire")));
 
     PlaySoundFireAndForget(FName(TEXT("Fire")));
@@ -133,4 +153,18 @@ void AQLWeaponGrenadeLauncher::OnFire()
         FVector FinalVelocity = ProjectileForwardVector * ProjectileSpeed;
         RecyclerGrenade->GetProjectileMovementComponent()->Velocity = FinalVelocity;
     }
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLWeaponGrenadeLauncher::OnFireRelease()
+{
+    if (!bIsFireHeld)
+    {
+        return;
+    }
+
+    bIsFireHeld = false;
+
+    GetWorldTimerManager().ClearTimer(HoldFireTimerHandle);
 }

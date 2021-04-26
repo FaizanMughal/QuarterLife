@@ -26,9 +26,13 @@
 AQLAbility::AQLAbility()
 {
  	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
-	PrimaryActorTick.bCanEverTick = true;
+	// PrimaryActorTick.xxx must be called in the constructor
+    // use SetActorTickEnabled(bFlag) for runtime configuration
+    PrimaryActorTick.bCanEverTick = true;
+    PrimaryActorTick.bStartWithTickEnabled = false;
 
     QLName = "None";
+    AbilityType = EQLAbility::None;
 
     DamageMultiplier = 1.0;
     bCanBeUsed = true;
@@ -122,7 +126,7 @@ void AQLAbility::OnComponentBeginOverlapImpl(UPrimitiveComponent* OverlappedComp
     if (QLCharacter)
     {
         QLCharacter->AddAbility(this);
-        QLCharacter->SetCurrentAbility(this->GetQLName());
+        QLCharacter->SetCurrentAbility(this->GetAbilityType());
         UpdateProgressOnUMGInternal(1.0f);
         PlaySound("PickUp");
     }
@@ -203,4 +207,23 @@ bool AQLAbility::IsActive()
 //------------------------------------------------------------
 void AQLAbility::OnAbilityEnd()
 {
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLAbility::OnAbilitySetCurrent()
+{
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLAbility::OnAbilityUnsetCurrent()
+{
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+EQLAbility AQLAbility::GetAbilityType() const
+{
+    return AbilityType;
 }

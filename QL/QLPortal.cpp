@@ -19,6 +19,7 @@
 #include "Engine/TextureRenderTarget2D.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "QLUtility.h"
+#include "Engine/Engine.h"
 
 //------------------------------------------------------------
 // Sets default values
@@ -34,22 +35,23 @@ AQLPortal::AQLPortal()
     BoxComponent->SetSimulatePhysics(false);
     BoxComponent->SetCollisionProfileName(TEXT("OverlapAllDynamic"));
 
-    FrameStaticMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("FrameStaticMesh"));
-    FrameStaticMesh->SetupAttachment(RootComponent);
-    FrameStaticMesh->SetSimulatePhysics(false);
-    FrameStaticMesh->SetCollisionProfileName(TEXT("NoCollision"));
-
-    DisplayPlaneStaticMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("DisplayPlaneStaticMesh"));
-    DisplayPlaneStaticMesh->SetupAttachment(RootComponent);
-    DisplayPlaneStaticMesh->SetSimulatePhysics(false);
-    DisplayPlaneStaticMesh->SetCollisionProfileName(TEXT("NoCollision"));
-
     SceneCaptureComponent = CreateDefaultSubobject<USceneCaptureComponent2D>(TEXT("SceneCaptureComponent"));
     SceneCaptureComponent->SetRelativeLocation(FVector(200.0f, 0.0f, 0.0f));
     SceneCaptureComponent->bEnableClipPlane = true;
     SceneCaptureComponent->bCaptureEveryFrame = true;
     SceneCaptureComponent->TextureTarget = nullptr;
+    SceneCaptureComponent->CaptureSource = ESceneCaptureSource::SCS_FinalColorHDR; // mitigate aliasing!!!
     SceneCaptureComponent->SetupAttachment(RootComponent);
+
+    bCanUpdatePortalView = true;
+
+    PortalFrameRate = 0.0f;
+
+    bCanTeleport = true;
+
+    // GSystemResolution is a global variable for resolution
+    PortalResolution.X = GSystemResolution.ResX;
+    PortalResolution.Y = GSystemResolution.ResY;
 }
 
 //------------------------------------------------------------
@@ -57,8 +59,25 @@ AQLPortal::AQLPortal()
 //------------------------------------------------------------
 void AQLPortal::BeginPlay()
 {
-	Super::BeginPlay();
+    // call Blueprint "event begin play" function
+    Super::BeginPlay();
 
+    // Blueprint subclass of AQLPortal should call SetPortalMaterialInstanceDynamic() to
+    // initialize PortalMaterialInstanceDynamic
+    if (PortalMaterialInstanceDynamic.IsValid())
+    {
+        PortalMaterialInstanceDynamic->SetTextureParameterValue("PortalTexture", RenderTarget);
+    }
+
+    if (!FMath::IsNearlyZero(PortalFrameRate, 1e-3f) && bCanUpdatePortalView)
+    {
+        GetWorldTimerManager().SetTimer(UpdatePortalTimerHandle,
+            this,
+            &AQLPortal::UpdateSCC,
+            PortalUpdateInterval, // time interval in second
+            true, // loop
+            0.0f); // delay in second
+    }
 }
 
 //------------------------------------------------------------
@@ -68,14 +87,17 @@ void AQLPortal::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-    UpdateSCC();
+    if (FMath::IsNearlyZero(PortalFrameRate, 1e-3f) && bCanUpdatePortalView)
+    {
+        UpdateSCC();
+    }
 }
 
 //------------------------------------------------------------
 // To list the available material parameters, use:
 // TArray<FMaterialParameterInfo> outParamInfo;
 // TArray<FGuid> outParamIds;
-// DynamicDisplayPlaneMaterial->GetAllTextureParameterInfo(outParamInfo, outParamIds);
+// PortalMaterialInstanceDynamic->GetAllTextureParameterInfo(outParamInfo, outParamIds);
 // for (auto&& item : outParamInfo)
 // {
 //     QLUtility::Screen(item.Name.ToString());
@@ -86,24 +108,40 @@ void AQLPortal::PostInitializeComponents()
     Super::PostInitializeComponents();
 
     RenderTarget = NewObject<UTextureRenderTarget2D>(this);
-    RenderTarget->InitAutoFormat(1920, 1080);
-    RenderTarget->AddressX = TextureAddress::TA_Wrap;
-    RenderTarget->AddressY = TextureAddress::TA_Wrap;
 
-    // set up scene campture component and reder target
+    // set up scene capture component and render target
     if (SceneCaptureComponent && RenderTarget)
     {
+        // initialize render target
+        RenderTarget->InitAutoFormat(PortalResolution.X, PortalResolution.Y);
+
+        RenderTarget->AddressX = TextureAddress::TA_Wrap;
+        RenderTarget->AddressY = TextureAddress::TA_Wrap;
+
+        SceneCaptureComponent->bEnableClipPlane = true;
         SceneCaptureComponent->TextureTarget = RenderTarget;
+
+        // set up to manually update scene capture instead of automatically
+        // when set to false, the component will render once on load and then only when moved
+        SceneCaptureComponent->bCaptureEveryFrame = false;
+        // when set to false, the capture component's content will not be automatically updated upon movement
+        SceneCaptureComponent->bCaptureOnMovement = false;
+
+        SceneCaptureComponent->bEnableClipPlane = true;
+
+        // must be identical to player camera's FOV
+        SceneCaptureComponent->FOVAngle = 100.0f;
+
+        SceneCaptureComponent->ProjectionType = ECameraProjectionMode::Perspective;
     }
 
-    UMaterialInterface* PortalMaterial = DisplayPlaneStaticMesh->GetMaterial(0);
-    if (PortalMaterial)
+    // built-in dynamic delegate
+    OnActorBeginOverlap.AddDynamic(this, &AQLPortal::OnOverlapBeginForActor);
+    OnActorEndOverlap.AddDynamic(this, &AQLPortal::OnOverlapEndForActor);
+
+    if (!FMath::IsNearlyZero(PortalFrameRate, 1e-3f))
     {
-        DynamicDisplayPlaneMaterial = DisplayPlaneStaticMesh->CreateAndSetMaterialInstanceDynamicFromMaterial(0, PortalMaterial);
-        if (DynamicDisplayPlaneMaterial.IsValid())
-        {
-            DynamicDisplayPlaneMaterial->SetTextureParameterValue("PortalTexture", RenderTarget);
-        }
+        PortalUpdateInterval = 1.0f / PortalFrameRate;
     }
 }
 
@@ -130,6 +168,9 @@ void AQLPortal::UpdateSCC()
     // update clip plane
     SceneCaptureComponent->ClipPlaneBase = Spouse->GetActorLocation();
     SceneCaptureComponent->ClipPlaneNormal = Spouse->GetActorForwardVector();
+
+    // manually capture the scene after spatial transform is completed
+    SceneCaptureComponent->CaptureScene();
 }
 
 //------------------------------------------------------------
@@ -213,7 +254,95 @@ UBoxComponent* AQLPortal::GetBoxComponent()
 
 //------------------------------------------------------------
 //------------------------------------------------------------
-UStaticMeshComponent* AQLPortal::GetDisplayPlaneStaticMesh()
+void AQLPortal::Debug()
 {
-    return DisplayPlaneStaticMesh;
+    QLUtility::Log(SceneCaptureComponent->GetComponentLocation().ToString());
+    QLUtility::Log(SceneCaptureComponent->GetComponentRotation().ToString());
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLPortal::SetCanUpdatePortalView(bool bFlag)
+{
+    bCanUpdatePortalView = bFlag;
+
+    if (bCanUpdatePortalView)
+    {
+        // if PortalFrameRate is NOT set to 0, apply specified PortalFrameRate
+        if (!FMath::IsNearlyZero(PortalFrameRate, 1e-3f))
+        {
+            // set the timer if it does not exist
+            if (!GetWorldTimerManager().TimerExists(UpdatePortalTimerHandle))
+            {
+                GetWorldTimerManager().SetTimer(UpdatePortalTimerHandle,
+                    this,
+                    &AQLPortal::UpdateSCC,
+                    PortalUpdateInterval, // time interval in second
+                    true, // loop
+                    0.0f); // delay in second
+            }
+        }
+    }
+    else
+    {
+        if (!FMath::IsNearlyZero(PortalFrameRate, 1e-3f))
+        {
+            // clear the timer if it exists
+            if (GetWorldTimerManager().TimerExists(UpdatePortalTimerHandle))
+            {
+                GetWorldTimerManager().ClearTimer(UpdatePortalTimerHandle); // delay in second
+            }
+        }
+    }
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLPortal::OnOverlapBeginForActor(AActor* OverlappedActor, AActor* OtherActor)
+{
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLPortal::OnOverlapEndForActor(AActor* OverlappedActor, AActor* OtherActor)
+{
+    // remove actor from my own roll if any
+    RemoveFromRoll(OtherActor);
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLPortal::AddToRoll(AActor* GivenActor)
+{
+    // if key exists, overwrite the value
+    Roll.Add(GivenActor);
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLPortal::RemoveFromRoll(AActor* GivenActor)
+{
+    // remove all the elements that match the given parameter
+    Roll.Remove(GivenActor);
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+bool AQLPortal::IsInMyRoll(AActor* GivenActor)
+{
+    return Roll.Contains(GivenActor);
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLPortal::SetPortalMaterialInstanceDynamic(UMaterialInstanceDynamic* PortalMaterialInstanceDynamicExt)
+{
+    PortalMaterialInstanceDynamic = PortalMaterialInstanceDynamicExt;
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLPortal::QLSetVisibility_Implementation(const bool bFlag)
+{
+
 }

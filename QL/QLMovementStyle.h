@@ -11,14 +11,16 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "QLPortalEnum.generated.h"
+#include "QLMovementStyle.generated.h"
 
 //------------------------------------------------------------
 //------------------------------------------------------------
 UENUM(BlueprintType)
-enum class EPortalColor : uint8
+enum class EQLMovementStyle : uint8
 {
-    Invalid UMETA(DisplayName="Invalid"),
-    Blue UMETA(DisplayName = "Blue"),
-    Orange UMETA(DisplayName = "Orange"),
+    Default UMETA(DisplayName = "Default"),
+    QuakeVanilla UMETA(DisplayName = "QuakeVanilla"), // vanilla quake 3, VQ3
+    QuakeCPMA UMETA(DisplayName = "QuakeCPMA"), // Challenge ProMode Arena
+    DoomGuy UMETA(DisplayName = "DoomGuy"),
+    QuakeCrouchSlide UMETA(DisplayName = "QuakeCrouchSlide"), // Slash, Strogg & Peeker
 };

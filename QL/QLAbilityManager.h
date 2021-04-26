@@ -11,6 +11,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "QLAbilityEnum.h"
 #include "UObject/NoExportTypes.h"
 #include "QLAbilityManager.generated.h"
 
@@ -33,13 +34,20 @@ public:
 
     void AddAbility(AQLAbility* Ability);
 
-    void SetCurrentAbility(const FName& QLName);
+    void DestroyAllAbility();
+
+    void SetCurrentAbility(const EQLAbility AbilityType);
 
     AQLAbility* GetCurrentAbility();
 
     void SetDamageMultiplier(const float Value);
 
     void CreateAndAddAllAbilities(const TArray<TSubclassOf<AQLAbility>>& AbilityClassList);
+
+    UFUNCTION(BlueprintCallable, Category = "C++Function")
+    void InitializeAbilityTimeTravel(AActor* NearActorExt, AActor* FarActorExt);
+
+    void Debug();
 protected:
     TWeakObjectPtr<AQLCharacter> User;
 

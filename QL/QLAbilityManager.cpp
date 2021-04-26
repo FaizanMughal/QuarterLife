@@ -18,6 +18,7 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "QLAbilityTimeTravel.h"
 
 //------------------------------------------------------------
 //------------------------------------------------------------
@@ -43,14 +44,14 @@ AQLCharacter* UQLAbilityManager::GetUser()
 
 //------------------------------------------------------------
 //------------------------------------------------------------
-void UQLAbilityManager::SetCurrentAbility(const FName& QLName)
+void UQLAbilityManager::SetCurrentAbility(const EQLAbility AbilityType)
 {
     // find if the named Ability is in the inventory
     AQLAbility* AbilityWanted = nullptr;
 
     for (const auto& Item : AbilityList)
     {
-        if (QLName == Item->GetQLName())
+        if (AbilityType == Item->GetAbilityType())
         {
             AbilityWanted = Item;
             break;
@@ -60,19 +61,18 @@ void UQLAbilityManager::SetCurrentAbility(const FName& QLName)
     // if it is not, do nothing
     if (!AbilityWanted)
     {
-        QLUtility::Log("Named ability not found : " + QLName.ToString());
         return;
     }
 
-    // if the current Ability exists, hide it
+    // if the current Ability exists, call the unset function
     if (CurrentAbility.IsValid())
     {
-        //CurrentAbility->GetGunSkeletalMeshComponent()->SetVisibility(false);
+        CurrentAbility->OnAbilityUnsetCurrent();
     }
 
     // change current Ability
     CurrentAbility = AbilityWanted;
-    //CurrentAbility->GetGunSkeletalMeshComponent()->SetVisibility(true);
+    CurrentAbility->OnAbilitySetCurrent();
 }
 
 
@@ -123,6 +123,9 @@ void UQLAbilityManager::AddAbility(AQLAbility* Ability)
     Ability->DisableComponentsSimulatePhysics();
     Ability->SetConstantRotationEnabled(false);
     Ability->SetDamageMultiplier(DamageMultiplier);
+
+    // make ability actor location always the same with character location
+    Ability->AttachToActor(User.Get(), FAttachmentTransformRules::SnapToTargetIncludingScale);
 }
 
 //------------------------------------------------------------
@@ -150,8 +153,50 @@ void UQLAbilityManager::CreateAndAddAllAbilities(const TArray<TSubclassOf<AQLAbi
     {
         auto* Ability = GetWorld()->SpawnActor<AQLAbility>(Item, FVector::ZeroVector, FRotator::ZeroRotator);
         AddAbility(Ability);
-        User->SetCurrentAbility(Ability->GetQLName());
+        User->SetCurrentAbility(Ability->GetAbilityType());
         Ability->UpdateProgressOnUMGInternal(1.0f);
     }
 }
 
+//------------------------------------------------------------
+//------------------------------------------------------------
+void UQLAbilityManager::InitializeAbilityTimeTravel(AActor* NearActorExt, AActor* FarActorExt)
+{
+    if (!User.IsValid())
+    {
+        return;
+    }
+
+    // find time travel ability
+    AQLAbilityTimeTravel* Result = nullptr;
+    for (const auto& Item : AbilityList)
+    {
+        Result = Cast<AQLAbilityTimeTravel>(Item);
+        if (Result)
+        {
+            break;
+        }
+    }
+
+    if (Result)
+    {
+        Result->SetNearAndFarActors(NearActorExt, FarActorExt);
+    }
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void UQLAbilityManager::Debug()
+{
+    CurrentAbility->Debug();
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void UQLAbilityManager::DestroyAllAbility()
+{
+    for (auto& Item : AbilityList)
+    {
+        Item->Destroy();
+    }
+}

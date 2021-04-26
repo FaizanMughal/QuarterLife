@@ -11,9 +11,12 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "QLWeaponEnum.h"
+#include "QLAbilityEnum.h"
 #include "GameFramework/Character.h"
 #include "QLPlayerHealthArmorBarUserWidget.h"
 #include "Components/TimelineComponent.h"
+#include "QLMoveComponentQuake.h"
 #include "QLCharacter.generated.h"
 
 class AQLWeapon;
@@ -23,6 +26,7 @@ class UQLAbilityManager;
 class UWidgetComponent;
 class UQLPowerupManager;
 class UAIPerceptionStimuliSourceComponent;
+class UQLMovementParameterQuake;
 
 //------------------------------------------------------------
 // In Blueprint,
@@ -46,7 +50,7 @@ class QL_API AQLCharacter : public ACharacter
 
 public:
     // Sets default values for this character's properties
-    AQLCharacter();
+    AQLCharacter(const class FObjectInitializer& ObjectInitializer);
 
     // Called every frame
     // virtual void Tick(float DeltaTime) override;
@@ -86,7 +90,7 @@ public:
     void AddWeapon(AQLWeapon* Weapon);
 
     UFUNCTION(BlueprintCallable, Category = "C++Function")
-    void SetCurrentWeapon(const FName& QLName);
+    void SetCurrentWeapon(const EQLWeapon WeaponType);
 
     UFUNCTION(BlueprintCallable, Category = "C++Function")
     AQLWeapon* GetCurrentWeapon();
@@ -95,7 +99,10 @@ public:
     void AddAbility(AQLAbility* Ability);
 
     UFUNCTION(BlueprintCallable, Category = "C++Function")
-    void SetCurrentAbility(const FName& QLName);
+    void SetCurrentAbility(const EQLAbility AbilityType);
+
+    UFUNCTION(BlueprintCallable, Category = "C++Function")
+    void SetCurrentMovementStyle(EQLMovementStyle MyStyle);
 
     UFUNCTION(BlueprintCallable, Category = "C++Function")
     bool AddPowerup(AQLPowerup* Powerup);
@@ -155,7 +162,7 @@ public:
     virtual UAnimSequence* PlayAnimationSequence(const FName& AnimationSequenceName);
 
     UFUNCTION(BlueprintCallable, Category = "C++Function")
-    bool HasWeapon(const FName& WeaponName);
+    bool HasWeapon(const EQLWeapon WeaponType);
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "C++Property")
     float Health;
@@ -225,9 +232,31 @@ public:
     bool IsJumpButtonDown();
 
     UFUNCTION(BlueprintCallable, Category = "C++Function")
+    float GetMoveForwardInputValue();
+
+    UFUNCTION(BlueprintCallable, Category = "C++Function")
+    float GetMoveRightInputValue();
+
+    UFUNCTION(BlueprintCallable, Category = "C++Function")
     void EquipAll();
 
     virtual void FellOutOfWorld(const UDamageType& dmgType) override;
+
+    UFUNCTION(BlueprintCallable, Category = "C++Function")
+    UQLAbilityManager* GetAbilityManager();
+
+    UFUNCTION(BlueprintCallable, Category = "C++Function")
+    void OnDebug();
+
+    UFUNCTION(BlueprintCallable, Category = "C++Function")
+    void PlaySoundFireAndForget(const FName& SoundName);
+
+    UFUNCTION(BlueprintCallable, Category = "C++Function")
+    void PlaySound(const FName& SoundName);
+
+    virtual void AddControllerYawInput(float Val) override;
+
+    virtual void AddControllerPitchInput(float Val) override;
 protected:
 
     // Pawn mesh : 1st person view(arms; seen only by self)
@@ -280,6 +309,9 @@ protected:
     void LookUpAtRate(float Rate);
 
     UFUNCTION(BlueprintCallable, Category = "C++Function")
+    void SwitchToGauntlet();
+
+    UFUNCTION(BlueprintCallable, Category = "C++Function")
     void SwitchToRocketLauncher();
 
     UFUNCTION(BlueprintCallable, Category = "C++Function")
@@ -300,12 +332,6 @@ protected:
     // Fires a projectile.
     UFUNCTION(BlueprintCallable, Category = "C++Function")
     void OnUseAbility();
-
-    UFUNCTION(BlueprintCallable, Category = "C++Function")
-    void PlaySoundFireAndForget(const FName& SoundName);
-
-    UFUNCTION(BlueprintCallable, Category = "C++Function")
-    void PlaySound(const FName& SoundName);
 
     UFUNCTION(BlueprintCallable, Category = "C++Function")
     void StopSound();
@@ -370,6 +396,12 @@ protected:
     bool bJumpButtonDown;
 
     UPROPERTY()
+    float moveForwardInputValue;
+
+    UPROPERTY()
+    float moveRightInputValue;
+
+    UPROPERTY()
     bool bQLIsBot;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "C++Property")
@@ -377,4 +409,10 @@ protected:
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "C++Property")
     float DurationAfterDeathBeforeRespawn;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "C++Property")
+    TSubclassOf<UQLMovementParameterQuake> MovementParameterQuakeClass;
+
+    UPROPERTY()
+    UQLMovementParameterQuake* MovementParameterQuake;
 };

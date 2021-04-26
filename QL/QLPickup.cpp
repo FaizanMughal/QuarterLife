@@ -21,7 +21,6 @@
 #include "Components/AudioComponent.h"
 #include "QLPlayerController.h"
 #include "QLWeaponManager.h"
-#include "Kismet/GameplayStatics.h"
 #include "QLUtility.h"
 #include "TimerManager.h"
 
@@ -139,14 +138,19 @@ void AQLPickup::PostInitializeComponents()
 
 //------------------------------------------------------------
 //------------------------------------------------------------
-void AQLPickup::PlayAnimationMontage(const FName& AnimationMontageName)
+void AQLPickup::PlayAnimationMontage(const FName& MontageName)
 {
 }
 
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLPickup::PlayAnimationMontageJumpToSection(const FName& MontageName, const FName& SectionName)
+{
+}
 
 //------------------------------------------------------------
 //------------------------------------------------------------
-void AQLPickup::PlaySoundFireAndForget(const FName& SoundName)
+void AQLPickup::PlaySoundFireAndForget(const FName& SoundName, EVirtualizationMode VirtualizationMode)
 {
     USoundBase** Result = SoundList.Find(SoundName);
     if (Result)
@@ -155,6 +159,9 @@ void AQLPickup::PlaySoundFireAndForget(const FName& SoundName)
 
         if (Sound && SoundAttenuation)
         {
+            // force sound to be always played when EVirtualizationMode::PlayWhenSilent
+            Sound->VirtualizationMode = VirtualizationMode;
+
             UGameplayStatics::PlaySoundAtLocation(GetWorld(),
                 Sound,
                 GetActorLocation(),
@@ -169,7 +176,28 @@ void AQLPickup::PlaySoundFireAndForget(const FName& SoundName)
 
 //------------------------------------------------------------
 //------------------------------------------------------------
-void AQLPickup::PlaySound(const FName& SoundName)
+USoundBase* AQLPickup::GetSoundBase(const FName& SoundName)
+{
+    USoundBase* MySoundBase = nullptr;
+    USoundBase** Result = SoundList.Find(SoundName);
+    if (Result)
+    {
+        USoundBase* Sound = *Result;
+        if (Sound)
+        {
+            // force sound to be always played when EVirtualizationMode::PlayWhenSilent
+            Sound->VirtualizationMode = EVirtualizationMode::PlayWhenSilent;
+
+            MySoundBase = Sound;
+        }
+    }
+
+    return MySoundBase;
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLPickup::PlaySound(const FName& SoundName, EVirtualizationMode VirtualizationMode)
 {
     USoundBase** Result = SoundList.Find(SoundName);
     if (Result)
@@ -177,6 +205,9 @@ void AQLPickup::PlaySound(const FName& SoundName)
         USoundBase* Sound = *Result;
         if (Sound)
         {
+            // force sound to be always played when EVirtualizationMode::PlayWhenSilent
+            Sound->VirtualizationMode = VirtualizationMode;
+
             SoundComponent->SetSound(Sound);
             SoundComponent->Play(0.0f);
         }
@@ -287,4 +318,11 @@ void AQLPickup::PerformRotationInterpWithDelay(const float Delay)
 void AQLPickup::PerformRotationInterpCallback()
 {
     bStartRotationInterp = true;
+}
+
+//------------------------------------------------------------
+//------------------------------------------------------------
+void AQLPickup::Debug()
+{
+
 }

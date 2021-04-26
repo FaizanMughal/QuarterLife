@@ -18,12 +18,14 @@
 //         Project settings --> Engine rendering --> Lighting --> Support global clip plane for planar reflections
 //
 // Portal gun compatible actor
+//    Any actor with a tag QLPortalCompatible is compatible with the portal gun
 //------------------------------------------------------------
 
 #pragma once
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "Math/IntPoint.h"
 #include "QLPortal.generated.h"
 
 //------------------------------------------------------------
@@ -57,8 +59,40 @@ public:
 
     //------------------------------------------------------------
     //------------------------------------------------------------
+    virtual void Debug();
+
+    //------------------------------------------------------------
+    //------------------------------------------------------------
     UFUNCTION(BlueprintCallable, Category = "C++Function")
-    UStaticMeshComponent* GetDisplayPlaneStaticMesh();
+    void SetCanUpdatePortalView(bool bFlag);
+
+    UFUNCTION()
+    void OnOverlapBeginForActor(AActor* OverlappedActor, AActor* OtherActor);
+
+    UFUNCTION()
+    void OnOverlapEndForActor(AActor* OverlappedActor, AActor* OtherActor);
+
+    void AddToRoll(AActor* GivenActor);
+
+    void RemoveFromRoll(AActor* GivenActor);
+
+    bool IsInMyRoll(AActor* GivenActor);
+
+    //------------------------------------------------------------
+    // Specify target material to which the render target feeds the view update per tick
+    //------------------------------------------------------------
+    UFUNCTION(BlueprintCallable, Category = "C++Function")
+    void SetPortalMaterialInstanceDynamic(UMaterialInstanceDynamic* PortalMaterialInstanceDynamicExt);
+
+    //------------------------------------------------------------
+    // Set the visibility of the mesh component (static mesh or skeletal mesh)
+    // To be overridden by blueprint.
+    // virtual void QLSetVisibility_Implementation(const bool bFlag); can be overriden in C++
+    //------------------------------------------------------------
+    UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "C++Function")
+    void QLSetVisibility(const bool bFlag);
+    virtual void QLSetVisibility_Implementation(const bool bFlag);
+
 
 protected:
     //------------------------------------------------------------
@@ -109,13 +143,8 @@ protected:
 
     //------------------------------------------------------------
     //------------------------------------------------------------
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "C++Property")
-    UStaticMeshComponent* FrameStaticMesh;
-
-    //------------------------------------------------------------
-    //------------------------------------------------------------
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "C++Property")
-    UStaticMeshComponent* DisplayPlaneStaticMesh;
+    UPROPERTY()
+    TWeakObjectPtr<UMaterialInstanceDynamic> PortalMaterialInstanceDynamic;
 
     //------------------------------------------------------------
     // The pairing portal
@@ -123,9 +152,28 @@ protected:
     UPROPERTY()
     TWeakObjectPtr<AQLPortal> Spouse;
 
-    //------------------------------------------------------------
-    // Points to the dynamic instanced material of DisplayPlaneStaticMesh
-    //------------------------------------------------------------
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "C++Property")
+    bool bCanUpdatePortalView;
+
+    // Whether the portal can teleport players, or just provide views
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "C++Property")
+    bool bCanTeleport;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "C++Property")
+    FIntPoint PortalResolution;
+
+    // The desired portal frame rate.
+    // 0 (default) is to match the native frame rate.
+    // Higher value is more resource demanding and affects performance more seriously.
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "C++Property", meta = (ClampMin = "0.0", ClampMax = "360.0"))
+    float PortalFrameRate;
+
     UPROPERTY()
-    TWeakObjectPtr <UMaterialInstanceDynamic> DynamicDisplayPlaneMaterial;
+    FTimerHandle UpdatePortalTimerHandle;
+
+    UPROPERTY()
+    float PortalUpdateInterval;
+
+    UPROPERTY()
+    TArray<AActor*> Roll;
 };

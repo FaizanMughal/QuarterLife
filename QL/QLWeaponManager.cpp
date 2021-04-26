@@ -44,14 +44,14 @@ AQLCharacter* UQLWeaponManager::GetUser()
 
 //------------------------------------------------------------
 //------------------------------------------------------------
-void UQLWeaponManager::SetCurrentWeapon(const FName& QLName)
+void UQLWeaponManager::SetCurrentWeapon(const EQLWeapon WeaponType)
 {
     // find if the named weapon is in the inventory
     AQLWeapon* WeaponWanted = nullptr;
 
     for (const auto& Item : WeaponList)
     {
-        if (QLName == Item->GetQLName())
+        if (WeaponType == Item->GetWeaponType())
         {
             WeaponWanted = Item;
             break;
@@ -73,6 +73,7 @@ void UQLWeaponManager::SetCurrentWeapon(const FName& QLName)
 
     // change current weapon
     CurrentWeapon = WeaponWanted;
+
     CurrentWeapon->GetGunSkeletalMeshComponent()->SetVisibility(true);
 
     // change cross-hair
@@ -159,7 +160,7 @@ void UQLWeaponManager::AddWeapon(AQLWeapon* Weapon)
 
     if (User->GetIsBot())
     {
-        Weapon->AttachToComponent(User->GetThirdPersonMesh(), FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true), TEXT("GripPoint"));
+        Weapon->AttachToComponent(User->GetThirdPersonMesh(), FAttachmentTransformRules::SnapToTargetIncludingScale, TEXT("GripPoint"));
         // hardcoded adjustment
         // todo: come up with a more elegant solution!
         Weapon->SetActorRelativeLocation(FVector(-2.0f, 8.0f, -4.0f));
@@ -167,7 +168,14 @@ void UQLWeaponManager::AddWeapon(AQLWeapon* Weapon)
     }
     else
     {
-        Weapon->AttachToComponent(User->GetFirstPersonMesh(), FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true), TEXT("GripPoint"));
+        if (Weapon->GetQLName() == FName(TEXT("Gauntlet")))
+        {
+            Weapon->AttachToComponent(User->GetFirstPersonMesh(), FAttachmentTransformRules::SnapToTargetIncludingScale, TEXT("GripPointDrill"));
+        }
+        else
+        {
+            Weapon->AttachToComponent(User->GetFirstPersonMesh(), FAttachmentTransformRules::SnapToTargetIncludingScale, TEXT("GripPoint"));
+        }
     }
 
     if (bIsGlowing)
@@ -252,11 +260,11 @@ void UQLWeaponManager::SetCurrentWeaponVisibility(const bool bFlag)
 
 //------------------------------------------------------------
 //------------------------------------------------------------
-bool UQLWeaponManager::HasWeapon(const FName& WeaponName)
+bool UQLWeaponManager::HasWeapon(const EQLWeapon WeaponType)
 {
     for (auto& Item : WeaponList)
     {
-        if (Item->GetQLName() == WeaponName)
+        if (Item->GetWeaponType() == WeaponType)
         {
             return true;
         }
